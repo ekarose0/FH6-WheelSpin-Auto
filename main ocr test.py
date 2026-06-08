@@ -511,7 +511,7 @@ class FH_UltimateBot(ctk.CTk):
                 "auto_restart": False,
                 "restart_cmd": "start steam://run/2483190", 
                 "use_ocr": True, 
-                "ocr_lang": "简体中文"
+                "ocr_lang": "한국어"
             }
         # 2. 读取用户的配置，并与底本合并
         if os.path.exists(ext_path):
@@ -535,6 +535,31 @@ class FH_UltimateBot(ctk.CTk):
         self.ocr_targets = {}
         int_path = os.path.join(INTERNAL_DIR, "assets", "config", "ocr_targets.json")
         ext_path = SYSTEM_OCR_FILE
+
+        def merge_targets(source_data):
+            updated = False
+            for k, v in source_data.items():
+                if k not in self.ocr_targets:
+                    self.ocr_targets[k] = v
+                    updated = True
+                    continue
+                if isinstance(v, dict) and isinstance(self.ocr_targets[k], dict):
+                    for lang, words in v.items():
+                        if lang not in self.ocr_targets[k]:
+                            self.ocr_targets[k][lang] = words
+                            updated = True
+                        else:
+                            for word in words:
+                                if word not in self.ocr_targets[k][lang]:
+                                    self.ocr_targets[k][lang].append(word)
+                                    updated = True
+                elif isinstance(v, list) and isinstance(self.ocr_targets[k], list):
+                    for word in v:
+                        if word not in self.ocr_targets[k]:
+                            self.ocr_targets[k].append(word)
+                            updated = True
+            return updated
+
         # 1. 优先尝试读取外部文件（因为外部文件可能是经过 Github 同步更新后的最新版）
         if os.path.exists(ext_path):
             try:
@@ -550,6 +575,16 @@ class FH_UltimateBot(ctk.CTk):
             except Exception as e:
                 self.log(f"致命错误：内置 ocr 词库也丢失: {e}")
 
+        # 3. 无论是否存在外部词库，都把内置的新语言项补进去，避免旧版外部词库缺少 ko。
+        try:
+            with open(int_path, "r", encoding="utf-8") as f:
+                if merge_targets(json.load(f)):
+                    os.makedirs(os.path.dirname(ext_path), exist_ok=True)
+                    with open(ext_path, "w", encoding="utf-8") as out:
+                        json.dump(self.ocr_targets, out, indent=4, ensure_ascii=False)
+        except Exception:
+            pass
+
         # 异步从 Github 更新词库
         def update_from_cloud():
             url = "https://raw.githubusercontent.com/YOUSTHEONE/FH6Auto/refs/heads/main/assets/ocr_targets.json"
@@ -557,29 +592,7 @@ class FH_UltimateBot(ctk.CTk):
                 resp = requests.get(url, timeout=5)
                 if resp.status_code == 200:
                     remote_data = resp.json()
-                    updated = False
-                    for k, v in remote_data.items():
-                        if k not in self.ocr_targets:
-                            self.ocr_targets[k] = v
-                            updated = True
-                        else:
-                            # 兼容字典(语言区分)和列表(通用图)的智能更新
-                            if isinstance(v, dict) and isinstance(self.ocr_targets[k], dict):
-                                for lang, words in v.items():
-                                    if lang not in self.ocr_targets[k]:
-                                        self.ocr_targets[k][lang] = words
-                                        updated = True
-                                    else:
-                                        for word in words:
-                                            if word not in self.ocr_targets[k][lang]:
-                                                self.ocr_targets[k][lang].append(word)
-                                                updated = True
-                            elif isinstance(v, list) and isinstance(self.ocr_targets[k], list):
-                                for word in v:
-                                    if word not in self.ocr_targets[k]:
-                                        self.ocr_targets[k].append(word)
-                                        updated = True
-                    if updated:
+                    if merge_targets(remote_data):
                         with open(SYSTEM_OCR_FILE, "w", encoding="utf-8") as f:
                             json.dump(self.ocr_targets, f, indent=4, ensure_ascii=False)
                         self.log("✅ OCR 多语言词库已通过网络同步最新规则！")
@@ -589,8 +602,8 @@ class FH_UltimateBot(ctk.CTk):
      # 【全新增函数：智能读取当前语言对应的词库】
     def get_ocr_target(self, key):
         """根据用户UI选定的语言，提取对应的词列表"""
-        lang_map = {"简体中文": "zh", "English": "en"}
-        current_lang = lang_map.get(self.config.get("ocr_lang", "简体中文"), "zh")
+        lang_map = {"简体中文": "zh", "English": "en", "한국어": "ko"}
+        current_lang = lang_map.get(self.config.get("ocr_lang", "한국어"), "ko")
         
         target = self.ocr_targets.get(key)
         
@@ -600,7 +613,7 @@ class FH_UltimateBot(ctk.CTk):
             
         # 如果是分语言的字典
         if isinstance(target, dict):
-            return target.get(current_lang, [])
+            return target.get(current_lang) or target.get("zh") or target.get("en") or []
         
         # 如果是 eventlab 这种不分语言的纯列表
         elif isinstance(target, list):
@@ -968,10 +981,10 @@ class FH_UltimateBot(ctk.CTk):
         )
         #self.cb_ocr.pack(side="left", padx=(10, 15))
         
-        self.var_ocr_lang = ctk.StringVar(value=self.config.get("ocr_lang", "简体中文"))
+        self.var_ocr_lang = ctk.StringVar(value=self.config.get("ocr_lang", "한국어"))
         self.cmb_ocr_lang = ctk.CTkOptionMenu(
             self.global_settings_frame,
-            values=["简体中文", "English"],
+            values=["简体中文", "English", "한국어"],
             variable=self.var_ocr_lang,
             width=100,
             command=self.on_ocr_lang_change
@@ -1133,10 +1146,11 @@ class FH_UltimateBot(ctk.CTk):
             import easyocr
             lang_map = {
                 "简体中文": ["ch_sim", "en"],
-                "English": ["en"]
+                "English": ["en"],
+                "한국어": ["ko", "en"],
             }
-            ui_lang = self.config.get("ocr_lang", "简体中文")
-            ocr_langs = lang_map.get(ui_lang, ["ch_sim", "en"])
+            ui_lang = self.config.get("ocr_lang", "한국어")
+            ocr_langs = lang_map.get(ui_lang, ["ko", "en"])
             
             os.makedirs(OCR_MODELS_DIR, exist_ok=True)
             # 【极其重要】：gpu=True！有显卡跑显卡，没显卡模型会自动回退CPU，绝不能锁死False！

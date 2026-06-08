@@ -7,3 +7,4 @@ requests
 pynput
 pillow
 pywin32
+pyinstaller

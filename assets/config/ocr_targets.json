@@ -1,67 +1,102 @@
 {
     "menu_anchor": {
         "zh": ["收集簿"],
-        "en": ["collection"]
+        "en": ["collection"],
+        "ko": ["컬렉션", "수집", "수집품"]
     },
     "exit_btn": {
         "zh": ["退出", "返回"],
-        "en": ["exit", "back"]
+        "en": ["exit", "back"],
+        "ko": ["나가기", "뒤로", "돌아가기", "종료"]
     },
     "exit_event": {
         "zh": ["退出比赛"],
-        "en": ["exit event"]
+        "en": ["exit event"],
+        "ko": ["이벤트 나가기", "레이스 나가기", "경기 나가기"]
     },
-    "eventlab": ["eventlab"],
+    "eventlab": {
+        "zh": ["eventlab", "活动实验室", "活動實驗室"],
+        "en": ["eventlab", "event lab"],
+        "ko": ["eventlab", "이벤트랩", "이벤트 랩"]
+    },
     "play_event": {
         "zh": ["游玩赛事", "遊玩賽事"],
-        "en": ["play event", "play events"]
+        "en": ["play event", "play events"],
+        "ko": ["이벤트 플레이", "이벤트 시작", "이벤트 플레이하기", "이벤트 참가"]
     },
     "view_event_info": {
         "zh": ["查看赛事信息", "查看賽事信息"],
-        "en": ["view event info"]
+        "en": ["view event info"],
+        "ko": ["이벤트 정보 보기", "이벤트 정보"]
     },
     "start_event": {
         "zh": ["开始竞赛赛事", "開始賽事"],
-        "en": ["start event", "start race"]
+        "en": ["start event", "start race"],
+        "ko": ["이벤트 시작", "레이스 시작", "경기 시작"]
     },
     "restart": {
         "zh": ["重新开始", "重新開始"],
-        "en": ["restart"]
+        "en": ["restart"],
+        "ko": ["다시 시작", "재시작"]
     },
     "buy_new_and_used": {
         "zh": ["购买新车", "新车", "二手车"],
-        "en": ["buy new", "used cars"]
+        "en": ["buy new", "used cars"],
+        "ko": ["신차 구입", "신차", "중고차", "신차 및 중고차"]
     },
     "buy_and_sell": {
         "zh": ["购买与出售", "購買與出售"],
-        "en": ["buy & sell", "buy and sell"]
+        "en": ["buy & sell", "buy and sell"],
+        "ko": ["구매 및 판매", "구매와 판매", "구입 및 판매"]
     },
     "choose_car": {
         "zh": ["选择车辆", "選擇車輛"],
-        "en": ["choose car"]
+        "en": ["choose car"],
+        "ko": ["차량 선택", "차 선택"]
+    },
+    "master_explorer": {
+        "zh": ["探索", "探索者"],
+        "en": ["explorer", "master explorer"],
+        "ko": ["탐험", "탐험가", "마스터 탐험가"]
+    },
+    "car_collection": {
+        "zh": ["车辆收集", "车辆收藏", "車輛收集", "車輛收藏"],
+        "en": ["car collection"],
+        "ko": ["차량 컬렉션", "차량 수집", "자동차 컬렉션"]
     },
     "car_mastery": {
         "zh": ["车辆熟练度", "車輛熟練度"],
-        "en": ["car mastery"]
+        "en": ["car mastery"],
+        "ko": ["차량 숙련도", "자동차 숙련도", "차량 마스터리"]
     },
     "upgrades_and_tuning": {
         "zh": ["升级与调校", "升級與調校"],
-        "en": ["upgrades & tuning", "upgrades and tuning"]
+        "en": ["upgrades & tuning", "upgrades and tuning"],
+        "ko": ["업그레이드 및 튜닝", "업그레이드와 튜닝"]
     },
     "not_enough_sp": {
         "zh": ["不够", "额外加成", "不足"],
-        "en": ["not enough", "perk"]
+        "en": ["not enough", "perk"],
+        "ko": ["부족", "스킬 포인트", "특전", "퍽"]
     },
     "get_in_car": {
         "zh": ["上车", "上車", "驾驶"],
-        "en": ["get in car", "drive"]
+        "en": ["get in car", "drive"],
+        "ko": ["차량 탑승", "탑승", "운전", "차 타기"]
     },
     "continue_btn": {
         "zh": ["继续", "繼續"],
-        "en": ["continue"]
+        "en": ["continue"],
+        "ko": ["계속", "이어하기"]
     },
     "dont_show_again": {
         "zh": ["不再显示该消息", "不再顯示該消息"],
-        "en": ["don't show this again", "dont show"]
+        "en": ["don't show this again", "dont show"],
+        "ko": ["다시 표시하지 않음", "이 메시지 다시 표시 안 함"]
+    },
+    "like_author": {
+        "zh": ["喜欢", "赞", "点赞"],
+        "en": ["like", "like author"],
+        "ko": ["좋아요", "제작자 좋아요", "작가 좋아요"]
     }
 }

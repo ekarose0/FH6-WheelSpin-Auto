@@ -1,50 +1,101 @@
 @echo off
-chcp 65001 >nul
 setlocal
+chcp 65001 >nul
 
 cd /d "%~dp0"
 
-set APP_NAME=FH6Auto
-set MAIN_FILE=main.py
+set "APP_NAME=FH6Auto"
+set "MAIN_FILE=main.py"
+set "py=py"
 
 echo.
-echo ==============================
-echo 开始打包 %APP_NAME%
-echo ==============================
+echo ========================================
+echo   Starting FH6Auto build
+echo ========================================
 echo.
 
-where python >nul 2>nul
-if errorlevel 1 (
-    echo [错误] 未找到 python，请先配置环境变量
+if not exist "%MAIN_FILE%" (
+    echo [ERROR] %MAIN_FILE% was not found.
     pause
     exit /b 1
 )
 
-echo [1/3] 清理旧文件...
+%py% --version >nul 2>nul
+if errorlevel 1 (
+    echo [ERROR] py was not found in PATH.
+    pause
+    exit /b 1
+)
+
+echo [1/4] Checking py dependencies...
+%py% -c "import customtkinter, cv2, numpy, pyautogui, pydirectinput, requests, pynput, PIL, win32gui" >nul 2>nul
+if errorlevel 1 (
+    echo [INFO] Missing dependencies detected. Installing requirements.txt...
+    %py% -m pip install -r requirements.txt
+    if errorlevel 1 (
+        echo.
+        echo [ERROR] Failed to install dependencies.
+        echo Run this manually, then build again:
+        echo %py% -m pip install -r requirements.txt
+        pause
+        exit /b 1
+    )
+)
+
+%py% -c "import PyInstaller" >nul 2>nul
+if errorlevel 1 (
+    echo [INFO] PyInstaller is missing. Installing PyInstaller...
+    %py% -m pip install pyinstaller
+    if errorlevel 1 (
+        echo.
+        echo [ERROR] Failed to install PyInstaller.
+        echo Run this manually, then build again:
+        echo %py% -m pip install pyinstaller
+        pause
+        exit /b 1
+    )
+)
+
+echo [2/4] Cleaning previous build output...
 if exist build rmdir /s /q build
 if exist dist rmdir /s /q dist
-if exist "%APP_NAME%.spec" del /f /q "%APP_NAME%.spec"
+mkdir build
+mkdir build\%APP_NAME%
+mkdir dist
 
-echo [2/3] 执行 PyInstaller...
-python -m PyInstaller ^
-    -n "%APP_NAME%" ^
-    -F ^
-    -w ^
+echo [3/4] Verifying source syntax...
+%py% -m py_compile "%MAIN_FILE%"
+if errorlevel 1 (
+    echo.
+    echo [ERROR] py syntax check failed.
+    pause
+    exit /b 1
+)
+
+echo [4/4] Running PyInstaller...
+%py% -m PyInstaller ^
+    --noconfirm ^
+    --clean ^
+    --onefile ^
+    --windowed ^
     --uac-admin ^
-    "%MAIN_FILE%" ^
-    --icon=assets/icon.ico ^
+    --name "%APP_NAME%" ^
+    --icon "assets\icon.ico" ^
     --add-data "images;images" ^
-    --add-data "assets;assets"
+    --add-data "assets;assets" ^
+    --collect-all customtkinter ^
+    --workpath "build" ^
+    --distpath "dist" ^
+    --specpath "." ^
+    "%MAIN_FILE%"
 
 if errorlevel 1 (
     echo.
-    echo [错误] 打包失败！
+    echo [ERROR] Build failed.
     pause
     exit /b 1
 )
 
 echo.
-echo [3/3] 打包完成！
-echo 输出目录: dist\%APP_NAME%.exe
-echo.
+echo [DONE] Build succeeded: dist\%APP_NAME%.exe
 pause
