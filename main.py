@@ -91,7 +91,7 @@ CACHE_DIR = os.path.join(APP_DIR, "cache")
 TEMPLATE_CACHE_FILE = os.path.join(CACHE_DIR, "template_cache.pkl")
 TEMPLATE_META_FILE = os.path.join(CACHE_DIR, "template_meta.json")
 CURRENT_VERSION = "1.1.6.2"
-CURRENT_VERSION_KR = "2"
+CURRENT_VERSION_KR = "3"
 def auto_extract_configs():
     os.makedirs(CONFIG_DIR, exist_ok=True)
     
@@ -729,7 +729,6 @@ class FH_UltimateBot(ctk.CTk):
         self.pause_requested = False
 
         self.use_win32_input = True
-        self.move_mouse_after_click = False
 
         self.race_counter = 0
         self.car_counter = 0
@@ -862,6 +861,7 @@ class FH_UltimateBot(ctk.CTk):
             "share_code": "100405213", 
             "auto_restart": False,
             "restart_cmd": "start steam://run/2483190", 
+            "race_mode": 1,
             "sell_mode": 1,
             "ui_language": DEFAULT_UI_LANGUAGE,
             "ocr_lang": "한국어",
@@ -904,6 +904,8 @@ class FH_UltimateBot(ctk.CTk):
             self.config["next_2"] = int(self.entry_next2.get())
             self.config["next_3"] = int(self.entry_next3.get())
             self.config["next_4"] = int(self.entry_next4.get())
+            if hasattr(self, "opt_race_mode"):
+                self.config["race_mode"] = self.race_mode_values.get(self.opt_race_mode.get(), 1)
             if hasattr(self, "opt_sell_mode"):
                 val = self.opt_sell_mode.get()
                 mode_values = getattr(self, "sell_mode_values", {})
@@ -1114,6 +1116,30 @@ class FH_UltimateBot(ctk.CTk):
         self.entry_share = ctk.CTkEntry(box_race, width=130, justify="center", placeholder_text=self.t("share_placeholder"))
         self.entry_share.insert(0, self.config.get("share_code", "890169683"))
         self.entry_share.pack(pady=4)
+
+        self.race_mode_values = {
+            "모드 1: 공유코드 입력": 1,
+            "모드 2: 첫번째 즐겨찾기 맵 사용": 2,
+            "모드 3: 마지막 플레이 맵 사용": 3,
+        }
+
+        self.opt_race_mode = ctk.CTkOptionMenu(
+            box_race,
+            values=list(self.race_mode_values.keys()),
+            width=190,
+            height=28,
+        )
+        
+        saved_race_mode = self.config.get("race_mode", 1)
+
+        if saved_race_mode == 2:
+            self.opt_race_mode.set("모드 2: 첫번째 즐겨찾기 맵 사용")
+        elif saved_race_mode == 3:
+            self.opt_race_mode.set("모드 3: 마지막 플레이 맵 사용")
+        else:
+            self.opt_race_mode.set("모드 1: 공유코드 입력")
+
+        self.opt_race_mode.pack(pady=4)
 
         self.next_frame1, self.entry_next1, self.chk1 = create_next_step(
             self.config_frame, self.var_chk1, self.config.get("next_1", 2)
@@ -1808,7 +1834,6 @@ class FH_UltimateBot(ctk.CTk):
 
         return vk_map.get(str(key).lower())
 
-
     def win32_key_down(self, key):
         try:
             import win32gui
@@ -1830,7 +1855,6 @@ class FH_UltimateBot(ctk.CTk):
             self.log(f"Win32 KeyDown 실패: {e}")
             return False
 
-
     def win32_key_up(self, key):
         try:
             import win32gui
@@ -1851,99 +1875,7 @@ class FH_UltimateBot(ctk.CTk):
         except Exception as e:
             self.log(f"Win32 KeyUp 실패: {e}")
             return False
-
-    def get_forza_hwnd(self):
-        try:
-            import win32gui
-            return win32gui.FindWindow(None, "Forza Horizon 6")
-        except Exception:
-            return None
-
-
-    def win32_vk(self, key):
-        import win32con
-
-        vk_map = {
-            "enter": win32con.VK_RETURN,
-            "esc": win32con.VK_ESCAPE,
-            "up": win32con.VK_UP,
-            "down": win32con.VK_DOWN,
-            "left": win32con.VK_LEFT,
-            "right": win32con.VK_RIGHT,
-            "space": win32con.VK_SPACE,
-            "backspace": win32con.VK_BACK,
-            "tab": win32con.VK_TAB,
-            "pagedown": win32con.VK_NEXT,
-            "pageup": win32con.VK_PRIOR,
-            "home": win32con.VK_HOME,
-            "end": win32con.VK_END,
-            "delete": win32con.VK_DELETE,
-
-            "w": ord("W"),
-            "a": ord("A"),
-            "s": ord("S"),
-            "d": ord("D"),
-            "x": ord("X"),
-            "y": ord("Y"),
-
-            "0": ord("0"),
-            "1": ord("1"),
-            "2": ord("2"),
-            "3": ord("3"),
-            "4": ord("4"),
-            "5": ord("5"),
-            "6": ord("6"),
-            "7": ord("7"),
-            "8": ord("8"),
-            "9": ord("9"),
-        }
-
-        return vk_map.get(str(key).lower())
-
-
-    def win32_key_down(self, key):
-        try:
-            import win32gui
-            import win32con
-
-            hwnd = self.get_forza_hwnd()
-            if not hwnd:
-                self.log("포르자 창을 찾지 못함")
-                return False
-
-            vk = self.win32_vk(key)
-            if not vk:
-                return False
-
-            win32gui.PostMessage(hwnd, win32con.WM_KEYDOWN, vk, 0)
-            return True
-
-        except Exception as e:
-            self.log(f"Win32 KeyDown 실패: {e}")
-            return False
-
-
-    def win32_key_up(self, key):
-        try:
-            import win32gui
-            import win32con
-
-            hwnd = self.get_forza_hwnd()
-            if not hwnd:
-                self.log("포르자 창을 찾지 못함")
-                return False
-
-            vk = self.win32_vk(key)
-            if not vk:
-                return False
-
-            win32gui.PostMessage(hwnd, win32con.WM_KEYUP, vk, 0)
-            return True
-
-        except Exception as e:
-            self.log(f"Win32 KeyUp 실패: {e}")
-            return False
-
+        
     def win32_press(self, key, hold=0.12):
         try:
             import time
@@ -1960,24 +1892,6 @@ class FH_UltimateBot(ctk.CTk):
 
         except Exception as e:
             self.log(f"Win32 입력 실패: {e}")
-            return False
-        
-    def win32_type_text(self, text, delay=0.12):
-        try:
-            for ch in str(text):
-                if not self.is_running:
-                    return False
-    
-                if ch not in DIK_CODES:
-                    continue
-                
-                self.hw_press(ch, delay=0.08)
-                time.sleep(delay)
-    
-            return True
-    
-        except Exception as e:
-            self.log(f"Win32 숫자 입력 실패: {e}")
             return False
 
     def win32_press_digit_precise(self, digit, hold=0.08):
@@ -2104,31 +2018,24 @@ class FH_UltimateBot(ctk.CTk):
             pydirectinput.mouseUp()
             time.sleep(0.1)
 
-        time.sleep(0.1)
+        time.sleep(0.3)
 
-        # 기존 모드에서만 마우스를 게임 좌상단으로 이동
-        try:
-            gx, gy, gw, gh = self.regions["全界面"]
-            self.hw_mouse_move(gx + 5, gy + 5)
-        except Exception:
-            self.hw_mouse_move(5, 5)
+        def move_to_game_coord(self, x, y):
+            """
+            기존 물리 입력 모드에서만 마우스를 치우는 함수입니다.
+            Win32 백그라운드 입력 모드에서는 실제 마우스를 움직이지 않습니다.
+            """
+            if getattr(self, "use_win32_input", False):
+                return
+        
+            try:
+                gx, gy, gw, gh = self.regions["全界面"]
+                abs_x = gx + x
+                abs_y = gy + y
+                self.hw_mouse_move(abs_x, abs_y)
+            except Exception:
+                self.hw_mouse_move(x, y)
 
-        time.sleep(0.2)
-
-    def move_to_game_coord(self, x, y):
-        """
-        将鼠标移动到以【游戏窗口左上角】为起点的 (x, y) 坐标。
-        例如传入 (5, 5)，就会移动到游戏内左上角 5 像素的安全位置。
-        """
-        try:
-            gx, gy, gw, gh = self.regions["全界面"]
-            abs_x = gx + x
-            abs_y = gy + y
-            self.hw_mouse_move(abs_x, abs_y)
-        except Exception:
-            # 兜底：如果获取不到窗口坐标，就直接当绝对坐标移动
-            self.hw_mouse_move(x, y)
-    
     def add_skill_dir(self, direction):
         self.config["skill_dirs"].append(direction)
         self.update_skill_grid()
@@ -3191,13 +3098,6 @@ class FH_UltimateBot(ctk.CTk):
             self.template_cache.clear()
             self.scaled_template_cache.clear()
             self.load_template_file_cache()
-
-    def get_forza_hwnd(self):
-        try:
-            return win32gui.FindWindow(None, "Forza Horizon 6")
-        except Exception:
-            return None
-
 
     def capture_forza_window_printwindow(self):
         try:
@@ -4345,60 +4245,86 @@ class FH_UltimateBot(ctk.CTk):
         self.game_click(pos_yg)
         time.sleep(1.5)
 
-        self.hw_press("backspace")
-        time.sleep(0.8)
-        self.hw_press("up")
-        time.sleep(0.4)
-        self.hw_press("enter")
-        time.sleep(0.8)
+        race_mode = 1
+        if hasattr(self, "opt_race_mode"):
+            race_mode = self.race_mode_values.get(self.opt_race_mode.get(), 1)
 
-        code_text = "".join(c for c in self.entry_share.get() if c.isdigit())
+        if race_mode == 1:
+            # 기존 공유코드 입력 방식
+            self.hw_press("backspace")
+            time.sleep(0.8)
+            self.hw_press("up")
+            time.sleep(0.4)
+            self.hw_press("enter")
+            time.sleep(0.8)
 
-        self.log(f"공유코드 입력 준비: {code_text}")
-        
-        if not code_text:
-            self.log("공유코드가 비어 있습니다. 입력을 중단합니다.")
-            return False
-        
-        time.sleep(1.0)
-        
-        if getattr(self, "use_win32_input", False):
-            self.log("공유코드 입력 방식: Win32 정밀 숫자 입력")
-        
-            for char in code_text:
-                if not self.is_running:
-                    return False
-        
-                self.log(f"공유코드 숫자 입력: {char}")
-        
-                if not self.win32_press_digit_precise(char, hold=0.08):
-                    self.log(f"공유코드 숫자 입력 실패: {char}")
-                    return False
-        
-                time.sleep(0.12)
-        
-        else:
-            self.log("공유코드 입력 방식: 기존 키 입력")
-        
-            for char in code_text:
-                if not self.is_running:
-                    return False
-        
-                if char in DIK_CODES:
+            code_text = "".join(c for c in self.entry_share.get() if c.isdigit())
+
+            self.log(f"공유코드 입력 준비: {code_text}")
+
+            if not code_text:
+                self.log("공유코드가 비어 있습니다. 입력을 중단합니다.")
+                return False
+
+            time.sleep(1.0)
+
+            if getattr(self, "use_win32_input", False):
+                self.log("공유코드 입력 방식: Win32 정밀 숫자 입력")
+
+                for char in code_text:
+                    if not self.is_running:
+                        return False
+
                     self.log(f"공유코드 숫자 입력: {char}")
-                    self.hw_press(char, delay=0.08)
+
+                    if not self.win32_press_digit_precise(char, hold=0.08):
+                        self.log(f"공유코드 숫자 입력 실패: {char}")
+                        return False
+
                     time.sleep(0.12)
-        
-        time.sleep(0.6)
-        self.log("공유코드 입력 단계 종료")
-                
-        time.sleep(0.4)
-        self.hw_press("enter")
-        time.sleep(0.8)
-        self.hw_press("down")
-        time.sleep(0.3)
-        self.hw_press("enter")
-        time.sleep(1.5)
+
+            else:
+                self.log("공유코드 입력 방식: 기존 키 입력")
+
+                for char in code_text:
+                    if not self.is_running:
+                        return False
+
+                    if char in DIK_CODES:
+                        self.hw_press(char, delay=0.08)
+                        time.sleep(0.12)
+
+            time.sleep(0.6)
+            self.log("공유코드 입력 단계 종료")
+
+            self.hw_press("enter")
+            time.sleep(0.8)
+            self.hw_press("down")
+            time.sleep(0.3)
+            self.hw_press("enter")
+            time.sleep(1.5)
+
+        elif race_mode == 2:
+            # 첫번째 즐겨찾기 맵 사용 방식
+            self.log("첫번째 즐겨찾기 맵 사용 모드: PageDown 7회로 이동합니다.")
+
+            for _ in range(7):
+                if not self.is_running:
+                    return False
+                self.hw_press("pagedown", delay=0.12)
+                time.sleep(0.25)
+            time.sleep(1.5)
+
+        elif race_mode == 3:
+            # 마지막 플레이 맵 사용 방식
+            self.log("마지막 플레이 맵 사용 모드: PageDown 8회로 이동합니다.")
+
+            for _ in range(8):
+                if not self.is_running:
+                    return False
+                self.hw_press("pagedown", delay=0.12)
+                time.sleep(0.25)
+            time.sleep(1.5)
 
         pos_ck = self.wait_for_image_gray(
             "VEI.png",
@@ -5390,7 +5316,7 @@ class FH_UltimateBot(ctk.CTk):
             time.sleep(1.0)
 
         return True
- 
+
     #===============================
     #---自动超级抽奖-----
     #===============================
