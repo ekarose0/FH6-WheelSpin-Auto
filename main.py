@@ -416,7 +416,7 @@ LOG_EXACT = {
     },
     "默认刷图车辆：【斯巴鲁Impreza 22B-STi Version】【调校S2  900】【保持默认涂装】【收藏车辆】": {
         "en": "Default race car: [Subaru Impreza 22B-STi Version], [Tune S2 900], [default livery], [favorite car].",
-        "ko": "기본 레이스 차량: [Subaru Impreza 22B-STi Version], [튜닝 S2 900], [기본 도색 유지], [즐겨찾기 차량].",
+        "ko": "기본 레이스 차량: [Subaru Impreza 22B-STi Version], [맵에 맞는 튜닝], [즐겨찾기 차량], [자신의 차량에 맞는 skillcar.png 변경 필수].",
     },
     "启动前先将键盘设置为【英文键盘】": {
         "en": "Set the keyboard to English before starting.",
