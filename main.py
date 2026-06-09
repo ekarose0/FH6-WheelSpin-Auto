@@ -1962,26 +1962,55 @@ class FH_UltimateBot(ctk.CTk):
             self.log(f"Win32 입력 실패: {e}")
             return False
         
-    def win32_type_text(self, text, delay=0.08):
+    def win32_type_text(self, text, delay=0.12):
+        try:
+            for ch in str(text):
+                if not self.is_running:
+                    return False
+    
+                if ch not in DIK_CODES:
+                    continue
+                
+                self.hw_press(ch, delay=0.08)
+                time.sleep(delay)
+    
+            return True
+    
+        except Exception as e:
+            self.log(f"Win32 숫자 입력 실패: {e}")
+            return False
+
+    def win32_press_digit_precise(self, digit, hold=0.08):
         try:
             import win32gui
             import win32con
-
+            import win32api
+    
             hwnd = self.get_forza_hwnd()
             if not hwnd:
                 self.log("포르자 창을 찾지 못함")
                 return False
-
-            for ch in str(text):
-                win32gui.PostMessage(hwnd, win32con.WM_CHAR, ord(ch), 0)
-                time.sleep(delay)
-
+    
+            digit = str(digit)
+            if digit not in "0123456789":
+                return False
+    
+            vk = ord(digit)
+            scan = win32api.MapVirtualKey(vk, 0)
+    
+            lparam_down = 1 | (scan << 16)
+            lparam_up = 1 | (scan << 16) | (1 << 30) | (1 << 31)
+    
+            win32gui.PostMessage(hwnd, win32con.WM_KEYDOWN, vk, lparam_down)
+            time.sleep(hold)
+            win32gui.PostMessage(hwnd, win32con.WM_KEYUP, vk, lparam_up)
+    
             return True
-
+    
         except Exception as e:
-            self.log(f"Win32 문자 입력 실패: {e}")
+            self.log(f"Win32 숫자 입력 실패: {e}")
             return False
-
+        
     def hw_press(self, key, delay=0.08):
         if not self.is_running:
             return
@@ -4325,16 +4354,44 @@ class FH_UltimateBot(ctk.CTk):
 
         code_text = "".join(c for c in self.entry_share.get() if c.isdigit())
 
+        self.log(f"공유코드 입력 준비: {code_text}")
+        
+        if not code_text:
+            self.log("공유코드가 비어 있습니다. 입력을 중단합니다.")
+            return False
+        
+        time.sleep(1.0)
+        
         if getattr(self, "use_win32_input", False):
-            self.win32_type_text(code_text, delay=0.08)
-        else:
+            self.log("공유코드 입력 방식: Win32 정밀 숫자 입력")
+        
             for char in code_text:
                 if not self.is_running:
                     return False
+        
+                self.log(f"공유코드 숫자 입력: {char}")
+        
+                if not self.win32_press_digit_precise(char, hold=0.08):
+                    self.log(f"공유코드 숫자 입력 실패: {char}")
+                    return False
+        
+                time.sleep(0.12)
+        
+        else:
+            self.log("공유코드 입력 방식: 기존 키 입력")
+        
+            for char in code_text:
+                if not self.is_running:
+                    return False
+        
                 if char in DIK_CODES:
-                    self.hw_press(char, delay=0.05)
-                    time.sleep(0.05)
-
+                    self.log(f"공유코드 숫자 입력: {char}")
+                    self.hw_press(char, delay=0.08)
+                    time.sleep(0.12)
+        
+        time.sleep(0.6)
+        self.log("공유코드 입력 단계 종료")
+                
         time.sleep(0.4)
         self.hw_press("enter")
         time.sleep(0.8)
