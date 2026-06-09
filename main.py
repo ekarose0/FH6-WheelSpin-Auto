@@ -1961,6 +1961,26 @@ class FH_UltimateBot(ctk.CTk):
         except Exception as e:
             self.log(f"Win32 입력 실패: {e}")
             return False
+        
+    def win32_type_text(self, text, delay=0.08):
+        try:
+            import win32gui
+            import win32con
+
+            hwnd = self.get_forza_hwnd()
+            if not hwnd:
+                self.log("포르자 창을 찾지 못함")
+                return False
+
+            for ch in str(text):
+                win32gui.PostMessage(hwnd, win32con.WM_CHAR, ord(ch), 0)
+                time.sleep(delay)
+
+            return True
+
+        except Exception as e:
+            self.log(f"Win32 문자 입력 실패: {e}")
+            return False
 
     def hw_press(self, key, delay=0.08):
         if not self.is_running:
@@ -4304,12 +4324,16 @@ class FH_UltimateBot(ctk.CTk):
         time.sleep(0.8)
 
         code_text = "".join(c for c in self.entry_share.get() if c.isdigit())
-        for char in code_text:
-            if not self.is_running:
-                return False
-            if char in DIK_CODES:
-                self.hw_press(char, delay=0.05)
-                time.sleep(0.05)
+
+        if getattr(self, "use_win32_input", False):
+            self.win32_type_text(code_text, delay=0.08)
+        else:
+            for char in code_text:
+                if not self.is_running:
+                    return False
+                if char in DIK_CODES:
+                    self.hw_press(char, delay=0.05)
+                    time.sleep(0.05)
 
         time.sleep(0.4)
         self.hw_press("enter")
