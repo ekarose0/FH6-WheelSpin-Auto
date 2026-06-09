@@ -4,7 +4,7 @@ chcp 65001 >nul
 
 cd /d "%~dp0"
 
-set "APP_NAME=FH6Auto"
+set "APP_NAME=FH6Auto_KR"
 set "MAIN_FILE=main.py"
 set "py=py"
 

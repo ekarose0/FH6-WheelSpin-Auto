@@ -90,7 +90,8 @@ LOG_FILE = os.path.join(APP_DIR, "bot_log.txt")
 CACHE_DIR = os.path.join(APP_DIR, "cache")
 TEMPLATE_CACHE_FILE = os.path.join(CACHE_DIR, "template_cache.pkl")
 TEMPLATE_META_FILE = os.path.join(CACHE_DIR, "template_meta.json")
-CURRENT_VERSION = "1.1.6.3"
+CURRENT_VERSION = "1.1.6.2"
+CURRENT_VERSION_KR = "2"
 def auto_extract_configs():
     os.makedirs(CONFIG_DIR, exist_ok=True)
     
@@ -343,7 +344,7 @@ UI_TEXT = {
     "sell_mode_2": {"zh": "模式2: 移除最近添加", "en": "Mode 2: Remove Recent", "ko": "모드 2: 최근 추가 제거"},
     "global_settings": {"zh": "⚙️ 循环与守护设置", "en": "⚙️ Loop & Watchdog", "ko": "⚙️ 반복 및 보호 설정"},
     "global_loops": {"zh": "大循环次数:", "en": "Loop Count:", "ko": "대루프 횟수:"},
-    "auto_restart": {"zh": "游戏闪退自动重启（测试）", "en": "Auto restart game crash (test)", "ko": "게임 종료 시 자동 재시작(테스트)"},
+    "auto_restart": {"zh": "游戏闪退自动重启（测试）", "en": "Auto restart game crash (test)", "ko": "치명적 오류 발생 시 자동 재시작"},
     "restart_cmd": {"zh": "启动命令(CMD):", "en": "Launch CMD:", "ko": "실행 명령(CMD):"},
     "language_label": {"zh": "语言:", "en": "Language:", "ko": "언어:"},
     "calculator": {"zh": "次数计算器", "en": "Run Calculator", "ko": "횟수 계산기"},
@@ -502,7 +503,7 @@ LOG_PATTERNS = [
     }),
     (r"成功移除车辆！当前进度: (\d+)/(\d+)", {
         "en": r"Car removed successfully. Progress: \1/\2",
-        "ko": r"차량 제거 성공. 현재 진행: \1/\2",
+        "ko": r"차량 제거 완료. 진행도: \1/\2",
     }),
 ]
 
@@ -535,15 +536,15 @@ LOG_PHRASES = {
     "识别到继续游戏，点击进入！": {"en": "Continue detected; clicking in.", "ko": "계속하기를 감지해 진입합니다."},
     "尝试按 ESC 唤出菜单...": {"en": "Trying ESC to open menu...", "ko": "ESC로 메뉴를 여는 중..."},
     "成功重连并进入菜单，准备恢复执行！": {"en": "Reconnected and entered menu. Ready to resume.", "ko": "재연결 후 메뉴에 진입했습니다. 실행을 복구합니다."},
-    "自动重启超时(2分钟未进入漫游)，放弃抢救。": {"en": "Auto restart timed out (not in freeroam within 2 minutes). Giving up recovery.", "ko": "자동 재시작 시간 초과(2분 내 자유 주행 미진입). 복구를 포기합니다."},
-    "任务执行异常中断，准备执行断点恢复流程...": {"en": "Task interrupted by exception. Preparing recovery flow...", "ko": "작업이 예외로 중단되었습니다. 중단점 복구 절차를 준비합니다..."},
-    "环境重置成功！即将从中断处继续剩余任务。": {"en": "Environment reset succeeded. Continuing remaining tasks from interruption point.", "ko": "환경 초기화에 성공했습니다. 중단 지점부터 남은 작업을 계속합니다."},
-    "验证漫游状态...": {"en": "Verifying freeroam state...", "ko": "자유 주행 상태 확인 중..."},
-    "验证成功：已确认处于游戏漫游界面。": {"en": "Verified: game is in freeroam.", "ko": "확인 성공: 게임이 자유 주행 화면입니다."},
+    "自动重启超时(2分钟未进入漫游)，放弃抢救。": {"en": "Auto restart timed out (not in freeroam within 2 minutes). Giving up recovery.", "ko": "재시작 후 2분 내 게임 진입 실패. 복구를 중단합니다."},
+    "任务执行异常中断，准备执行断点恢复流程...": {"en": "Task interrupted by exception. Preparing recovery flow...", "ko": "예외 발생. 자동 복구를 시도합니다..."},
+    "环境重置成功！即将从中断处继续剩余任务。": {"en": "Environment reset succeeded. Continuing remaining tasks from interruption point.", "ko": "복구 완료. 중단된 작업을 이어서 진행합니다."},
+    "验证漫游状态...": {"en": "Verifying freeroam state...", "ko": "자유주행 상태 확인 중..."},
+    "验证成功：已确认处于游戏漫游界面。": {"en": "Verified: game is in freeroam.", "ko": "확인 완료: 자유주행 화면입니다."},
     "多次尝试验证漫游界面失败，尝试进入菜单。": {"en": "Freeroam verification failed repeatedly; trying to enter menu.", "ko": "자유 주행 화면 확인을 여러 번 실패해 메뉴 진입을 시도합니다."},
     "开始尝试退回主菜单 (强制ESC兜底)...": {"en": "Trying to return to main menu (ESC fallback)...", "ko": "메인 메뉴 복귀를 시도합니다(ESC 대체 절차)..."},
     "正在尝试进入主菜单 (按ESC验证)...": {"en": "Trying to enter main menu (ESC verification)...", "ko": "메인 메뉴 진입 시도 중(ESC 확인)..."},
-    "60 次 ESC 尝试均未进入菜单，请检查游戏状态。": {"en": "Failed to enter menu after 60 ESC attempts. Check game state.", "ko": "ESC 60회 시도 후에도 메뉴에 진입하지 못했습니다. 게임 상태를 확인하세요."},
+    "60 次 ESC 尝试均未进入菜单，请检查游戏状态。": {"en": "Failed to enter menu after 60 ESC attempts. Check game state.", "ko": "ESC 60회 시도 후에도 메뉴 진입 실패. 게임 상태를 확인하세요."},
     "开始构建模板缓存文件...": {"en": "Building template cache file...", "ko": "템플릿 캐시 파일 생성 중..."},
     "未找到 images 目录，无法构建模板缓存。": {"en": "images directory not found; cannot build template cache.", "ko": "images 디렉터리를 찾지 못해 템플릿 캐시를 만들 수 없습니다."},
     "模板缓存文件构建完成。": {"en": "Template cache file built.", "ko": "템플릿 캐시 파일 생성 완료."},
@@ -559,9 +560,9 @@ LOG_PHRASES = {
     "未找到带 liketag 的目标车辆，重新选品牌...": {"en": "Target car with liketag not found; selecting brand again...", "ko": "liketag가 있는 대상 차량을 찾지 못해 브랜드를 다시 선택합니다..."},
     "三次尝试未找到刷图车辆品牌。": {"en": "Failed to find race car brand after three attempts.", "ko": "세 번 시도했지만 레이스 차량 브랜드를 찾지 못했습니다."},
     "翻页未能找到带有 liketag 的刷图车辆！": {"en": "Could not find race car with liketag after paging.", "ko": "페이지를 넘겨도 liketag가 있는 레이스 차량을 찾지 못했습니다."},
-    "前置完成，开始循环跑图！": {"en": "Setup complete. Starting repeat race loop.", "ko": "사전 준비 완료. 반복 레이스를 시작합니다."},
-    "找不到赛事起点，退出跑图。": {"en": "Event start not found; exiting race loop.", "ko": "이벤트 시작 지점을 찾지 못해 레이스를 종료합니다."},
-    "跑图超时(已超过120秒)！触发强制重开赛事逻辑...": {"en": "Race timed out (over 120 seconds). Triggering forced restart logic...", "ko": "레이스 시간 초과(120초 초과). 강제 재시작 로직을 실행합니다..."},
+    "前置完成，开始循环跑图！": {"en": "Setup complete. Starting repeat race loop.", "ko": "준비 완료. 반복 레이스를 시작합니다."},
+    "找不到赛事起点，退出跑图。": {"en": "Event start not found; exiting race loop.", "ko": "이벤트 시작 지점을 찾지 못했습니다. 레이스를 종료합니다."},
+    "跑图超时(已超过120秒)！触发强制重开赛事逻辑...": {"en": "Race timed out (over 120 seconds). Triggering forced restart logic...", "ko": "레이스 시간 초과(120초). 이벤트를 다시 시작합니다..."},
     "识别到点赞作界面，执行回车确认！": {"en": "Like/dislike author screen detected; pressing Enter.", "ko": "제작자 좋아요 화면을 감지해 Enter로 확인합니다."},
     "找到 restarta.png，点击重开赛事...": {"en": "restarta.png found; clicking restart event...", "ko": "restarta.png를 찾았습니다. 이벤트를 다시 시작합니다..."},
     "未找到 restarta.png，尝试直接继续...": {"en": "restarta.png not found; trying to continue directly...", "ko": "restarta.png를 찾지 못해 바로 계속 시도합니다..."},
@@ -591,10 +592,10 @@ LOG_PHRASES = {
     "30次内未找到购买与出售": {"en": "Buy & Sell not found within 30 attempts.", "ko": "30회 안에 구매 및 판매를 찾지 못했습니다."},
     "切换到 最近获得 的排序...": {"en": "Switching sort to Recently Acquired...", "ko": "정렬을 최근 획득으로 전환합니다..."},
     "回到最近获得的前面": {"en": "Returning to the front of Recently Acquired.", "ko": "최근 획득 목록의 앞쪽으로 돌아갑니다."},
-    "开始删除最近获得的车辆！！！请人工确认是否移除": {"en": "Starting removal of recently acquired cars. Manually confirm before removing.", "ko": "최근 획득 차량 삭제를 시작합니다. 제거 여부를 직접 확인하세요."},
+    "开始删除最近获得的车辆！！！请人工确认是否移除": {"en": "Starting removal of recently acquired cars. Manually confirm before removing.", "ko": "최근 획득 차량 삭제 시작. 제거 대상이 맞는지 확인하세요."},
     "切换到消耗品品牌...": {"en": "Switching to consumable brand...", "ko": "소모용 차량 브랜드로 전환 중..."},
     "=连续翻找 2 页仍未搜索到目标车辆！视为车辆已全部清理完毕。": {"en": "Target car not found after 2 consecutive pages. Treating cleanup as complete.", "ko": "2페이지 연속 대상 차량을 찾지 못했습니다. 차량 정리가 완료된 것으로 간주합니다."},
-    "主动结束清理任务，准备进入下一步骤...": {"en": "Ending cleanup task and preparing for next step...", "ko": "정리 작업을 종료하고 다음 단계로 이동합니다..."},
+    "主动结束清理任务，准备进入下一步骤...": {"en": "Ending cleanup task and preparing for next step...", "ko": "차량 정리 완료. 다음 단계로 이동합니다."},
     "精准锁定目标车辆，执行点击...": {"en": "Target car precisely locked; clicking...", "ko": "대상 차량을 정확히 고정해 클릭합니다..."},
     "寻找 '从车库移除' 按钮...": {"en": "Finding 'Remove from garage' button...", "ko": "'차고에서 제거' 버튼을 찾는 중..."},
     "直接找到移除按钮，点击...": {"en": "Remove button found directly; clicking...", "ko": "제거 버튼을 바로 찾아 클릭합니다..."},
@@ -706,7 +707,7 @@ class FH_UltimateBot(ctk.CTk):
     def __init__(self):
         super().__init__()
         #窗口相关
-        self.title(f"FH6Auto by YSTO v{CURRENT_VERSION}")
+        self.title(f"FH6Auto KR Edition v{CURRENT_VERSION_KR} / Original by YSTO v{CURRENT_VERSION}")
         self.geometry("1800x800")
         #self.minsize(980, 560)
         self.attributes("-topmost", False)
@@ -724,8 +725,11 @@ class FH_UltimateBot(ctk.CTk):
         self.current_thread = None
 
         # 일시정지 / 재개 상태
-        self.is_paused = False          # 실제 일시정지 상태
-        self.pause_requested = False    # F9 또는 버튼으로 일시정지를 요청했는지
+        self.is_paused = False 
+        self.pause_requested = False
+
+        self.use_win32_input = True
+        self.move_mouse_after_click = False
 
         self.race_counter = 0
         self.car_counter = 0
@@ -1612,13 +1616,24 @@ class FH_UltimateBot(ctk.CTk):
 
         ctk.CTkButton(
             btn_frame,
-            text="GitHub",
-            width=100,
+            text="원본 GitHub",
+            width=120,
             height=30,
             fg_color="#2EA043",
             hover_color="#238636",
             command=lambda: webbrowser.open("https://github.com/YOUSTHEONE/FH6Auto"),
         ).pack(side="left", padx=5)
+
+        ctk.CTkButton(
+            btn_frame,
+            text="한국어 GitHub",
+            width=120,
+            height=30,
+            fg_color="#0969DA",
+            hover_color="#0A58CA",
+            command=lambda: webbrowser.open("https://github.com/ekarose0/FH6-WheelSpin-Auto"),
+        ).pack(side="left", padx=5)
+        
     def update_timer(self):
         if not self.is_running:
             return
@@ -1719,6 +1734,9 @@ class FH_UltimateBot(ctk.CTk):
     # --- 核心操作与流程控制 ---
     # ==========================================
     def hw_key_down(self, key):
+        if getattr(self, "use_win32_input", False):
+            if self.win32_key_down(key):
+                return
         if key not in DIK_CODES:
             return
         scan_code, extended = DIK_CODES[key]
@@ -1730,6 +1748,9 @@ class FH_UltimateBot(ctk.CTk):
         SendInput(1, ctypes.pointer(x), ctypes.sizeof(x))
 
     def hw_key_up(self, key):
+        if getattr(self, "use_win32_input", False):
+            if self.win32_key_up(key):
+                return
         if key not in DIK_CODES:
             return
         scan_code, extended = DIK_CODES[key]
@@ -1740,9 +1761,216 @@ class FH_UltimateBot(ctk.CTk):
         x = Input(ctypes.c_ulong(1), ii_)
         SendInput(1, ctypes.pointer(x), ctypes.sizeof(x))
 
+    def get_forza_hwnd(self):
+        try:
+            import win32gui
+            return win32gui.FindWindow(None, "Forza Horizon 6")
+        except Exception:
+            return None
+    
+    def win32_vk(self, key):
+        import win32con
+
+        vk_map = {
+            "enter": win32con.VK_RETURN,
+            "esc": win32con.VK_ESCAPE,
+            "up": win32con.VK_UP,
+            "down": win32con.VK_DOWN,
+            "left": win32con.VK_LEFT,
+            "right": win32con.VK_RIGHT,
+            "space": win32con.VK_SPACE,
+            "backspace": win32con.VK_BACK,
+            "tab": win32con.VK_TAB,
+            "pagedown": win32con.VK_NEXT,
+            "pageup": win32con.VK_PRIOR,
+            "home": win32con.VK_HOME,
+            "end": win32con.VK_END,
+            "delete": win32con.VK_DELETE,
+
+            "w": ord("W"),
+            "a": ord("A"),
+            "s": ord("S"),
+            "d": ord("D"),
+            "x": ord("X"),
+            "y": ord("Y"),
+
+            "0": ord("0"),
+            "1": ord("1"),
+            "2": ord("2"),
+            "3": ord("3"),
+            "4": ord("4"),
+            "5": ord("5"),
+            "6": ord("6"),
+            "7": ord("7"),
+            "8": ord("8"),
+            "9": ord("9"),
+        }
+
+        return vk_map.get(str(key).lower())
+
+
+    def win32_key_down(self, key):
+        try:
+            import win32gui
+            import win32con
+
+            hwnd = self.get_forza_hwnd()
+            if not hwnd:
+                self.log("포르자 창을 찾지 못함")
+                return False
+
+            vk = self.win32_vk(key)
+            if not vk:
+                return False
+
+            win32gui.PostMessage(hwnd, win32con.WM_KEYDOWN, vk, 0)
+            return True
+
+        except Exception as e:
+            self.log(f"Win32 KeyDown 실패: {e}")
+            return False
+
+
+    def win32_key_up(self, key):
+        try:
+            import win32gui
+            import win32con
+
+            hwnd = self.get_forza_hwnd()
+            if not hwnd:
+                self.log("포르자 창을 찾지 못함")
+                return False
+
+            vk = self.win32_vk(key)
+            if not vk:
+                return False
+
+            win32gui.PostMessage(hwnd, win32con.WM_KEYUP, vk, 0)
+            return True
+
+        except Exception as e:
+            self.log(f"Win32 KeyUp 실패: {e}")
+            return False
+
+    def get_forza_hwnd(self):
+        try:
+            import win32gui
+            return win32gui.FindWindow(None, "Forza Horizon 6")
+        except Exception:
+            return None
+
+
+    def win32_vk(self, key):
+        import win32con
+
+        vk_map = {
+            "enter": win32con.VK_RETURN,
+            "esc": win32con.VK_ESCAPE,
+            "up": win32con.VK_UP,
+            "down": win32con.VK_DOWN,
+            "left": win32con.VK_LEFT,
+            "right": win32con.VK_RIGHT,
+            "space": win32con.VK_SPACE,
+            "backspace": win32con.VK_BACK,
+            "tab": win32con.VK_TAB,
+            "pagedown": win32con.VK_NEXT,
+            "pageup": win32con.VK_PRIOR,
+            "home": win32con.VK_HOME,
+            "end": win32con.VK_END,
+            "delete": win32con.VK_DELETE,
+
+            "w": ord("W"),
+            "a": ord("A"),
+            "s": ord("S"),
+            "d": ord("D"),
+            "x": ord("X"),
+            "y": ord("Y"),
+
+            "0": ord("0"),
+            "1": ord("1"),
+            "2": ord("2"),
+            "3": ord("3"),
+            "4": ord("4"),
+            "5": ord("5"),
+            "6": ord("6"),
+            "7": ord("7"),
+            "8": ord("8"),
+            "9": ord("9"),
+        }
+
+        return vk_map.get(str(key).lower())
+
+
+    def win32_key_down(self, key):
+        try:
+            import win32gui
+            import win32con
+
+            hwnd = self.get_forza_hwnd()
+            if not hwnd:
+                self.log("포르자 창을 찾지 못함")
+                return False
+
+            vk = self.win32_vk(key)
+            if not vk:
+                return False
+
+            win32gui.PostMessage(hwnd, win32con.WM_KEYDOWN, vk, 0)
+            return True
+
+        except Exception as e:
+            self.log(f"Win32 KeyDown 실패: {e}")
+            return False
+
+
+    def win32_key_up(self, key):
+        try:
+            import win32gui
+            import win32con
+
+            hwnd = self.get_forza_hwnd()
+            if not hwnd:
+                self.log("포르자 창을 찾지 못함")
+                return False
+
+            vk = self.win32_vk(key)
+            if not vk:
+                return False
+
+            win32gui.PostMessage(hwnd, win32con.WM_KEYUP, vk, 0)
+            return True
+
+        except Exception as e:
+            self.log(f"Win32 KeyUp 실패: {e}")
+            return False
+
+    def win32_press(self, key, hold=0.12):
+        try:
+            import time
+
+            if not self.win32_key_down(key):
+                return False
+
+            time.sleep(hold)
+
+            if not self.win32_key_up(key):
+                return False
+
+            return True
+
+        except Exception as e:
+            self.log(f"Win32 입력 실패: {e}")
+            return False
+
     def hw_press(self, key, delay=0.08):
         if not self.is_running:
             return
+
+        if getattr(self, "use_win32_input", False):
+            self.win32_press(key, hold=0.12)
+            time.sleep(max(delay, 0.18))
+            return
+
         self.hw_key_down(key)
         time.sleep(delay)
         self.hw_key_up(key)
@@ -1769,28 +1997,73 @@ class FH_UltimateBot(ctk.CTk):
         ii_.mi = MouseInput(calc_x, calc_y, 0, flags, 0, ctypes.pointer(extra))
         cmd = Input(ctypes.c_ulong(0), ii_)
         SendInput(1, ctypes.pointer(cmd), ctypes.sizeof(cmd))
+    
+    def win32_click(self, pos, double=False):
+        if not self.is_running or not pos:
+            return False
+
+        try:
+            import win32gui
+            import win32con
+            import win32api
+
+            hwnd = win32gui.FindWindow(None, "Forza Horizon 6")
+            if not hwnd:
+                self.log("포르자 창을 찾지 못함")
+                return False
+
+            # 화면 절대좌표 → 포르자 클라이언트 내부 좌표
+            x, y = int(pos[0]), int(pos[1])
+            cx, cy = win32gui.ScreenToClient(hwnd, (x, y))
+
+            lparam = win32api.MAKELONG(cx, cy)
+
+            for _ in range(2 if double else 1):
+                win32gui.PostMessage(hwnd, win32con.WM_MOUSEMOVE, 0, lparam)
+                time.sleep(0.05)
+                win32gui.PostMessage(hwnd, win32con.WM_LBUTTONDOWN, win32con.MK_LBUTTON, lparam)
+                time.sleep(0.08)
+                win32gui.PostMessage(hwnd, win32con.WM_LBUTTONUP, 0, lparam)
+                time.sleep(0.12)
+
+            return True
+
+        except Exception as e:
+            self.log(f"Win32 클릭 실패: {e}")
+            return False
+
     def game_click(self, pos, double=False):
         if not self.is_running or not pos:
             return
+
+        # 백그라운드 모드: 실제 마우스 사용 금지
+        if getattr(self, "use_win32_input", False):
+            if not self.win32_click(pos, double=double):
+                self.log("Win32 클릭 실패: 백그라운드 모드에서는 실제 마우스 클릭으로 대체하지 않습니다.")
+            time.sleep(0.2)
+            return
+
+        # 기존 모드: 실제 마우스 사용
         x, y = int(pos[0]), int(pos[1])
-        
-        # 使用多屏兼容的硬件级移动
+
         self.hw_mouse_move(x, y)
         time.sleep(0.2)
+
         for _ in range(2 if double else 1):
             pydirectinput.mouseDown()
             time.sleep(0.1)
             pydirectinput.mouseUp()
             time.sleep(0.1)
+
         time.sleep(0.1)
-        # 移开鼠标 10 像素，防止游戏里的悬浮提示框遮挡下一次截图
+
+        # 기존 모드에서만 마우스를 게임 좌상단으로 이동
         try:
             gx, gy, gw, gh = self.regions["全界面"]
-            # 移动到游戏左上角向内偏移 5 个像素，确保在游戏内但绝对不会挡住任何中间UI
             self.hw_mouse_move(gx + 5, gy + 5)
         except Exception:
-            # 兜底：如果获取不到窗口坐标，移到绝对屏幕左上角
             self.hw_mouse_move(5, 5)
+
         time.sleep(0.2)
 
     def move_to_game_coord(self, x, y):
@@ -2522,28 +2795,32 @@ class FH_UltimateBot(ctk.CTk):
         return False
 
     def handle_vramne_restart(self):
+        auto_restart = getattr(self, "var_auto_restart", None)
+        if auto_restart is None or not auto_restart.get():
+            self.log("VRAM 오류 감지: 자동 재시작이 꺼져 있어 게임을 강제 종료하지 않습니다.")
+            return False
+
         self.log("!!! 检测到 VRAMNE.png，2秒后强杀游戏，等待10分钟再重启...")
         time.sleep(2.0)
-    
+
         if not self.is_running:
             return False
-    
+
         try:
             os.system('taskkill /F /IM forzahorizon6.exe /T')
             self.log("已强杀 forzahorizon6.exe")
         except Exception as e:
             self.log(f"强杀游戏失败: {e}")
             return False
-    
+
         self.log("开始等待 10 分钟释放显存...")
         for _ in range(600):
             if not self.is_running:
                 return False
             time.sleep(1)
-    
+
         self.log("10分钟等待结束，准备自动重启游戏...")
         return self.restart_game_and_boot()
-    
     
     def check_vramne_during_race(self):
         try:
@@ -2567,13 +2844,20 @@ class FH_UltimateBot(ctk.CTk):
                 return False
         else:
             if not self.advanced_enter_menu():
-                self.log("高级动态退回失败(可能游戏卡死或致命报错)，准备强杀进程并重启...")
+                auto_restart = getattr(self, "var_auto_restart", None)
+            
+                if auto_restart is None or not auto_restart.get():
+                    self.log("고급 복구 실패: 자동 재시작이 꺼져 있어 게임을 강제 종료하지 않고 작업만 중지합니다.")
+                    return False
+            
+                self.log("고급 복구 실패: 자동 재시작이 켜져 있어 게임을 강제 종료 후 재시작합니다.")
+            
                 try:
                     os.system('taskkill /F /IM forzahorizon6.exe /T')
                     time.sleep(4)
                 except Exception:
                     pass
-
+                
                 if not self.restart_game_and_boot():
                     return False
 
@@ -2674,20 +2958,29 @@ class FH_UltimateBot(ctk.CTk):
             # 2. 致命错误排查 (检测到显存不足，强制休息 10 分钟)
             if self.find_image_gray("VRAMNE.png", region=self.regions["全界面"], threshold=0.75, fast_mode=True):
                 self.log("!!! 严重警告: 检测到显存不足 (VRAMNE.png) 报错！")
-                self.log("2秒后强杀游戏，随后冷却 10 分钟...")
+            
+                auto_restart = getattr(self, "var_auto_restart", None)
+                if auto_restart is None or not auto_restart.get():
+                    self.log("VRAM 오류 감지: 자동 재시작이 꺼져 있어 게임을 강제 종료하지 않습니다.")
+                    return False
+            
+                self.log("자동 재시작이 켜져 있어 2초 후 게임을 강제 종료하고 10분 대기합니다.")
                 time.sleep(2.0)
+            
                 try:
                     os.system('taskkill /F /IM forzahorizon6.exe /T')
                     self.log("已强杀 forzahorizon6.exe")
                 except Exception as e:
                     self.log(f"强杀游戏失败: {e}")
                     return False
+            
                 for _ in range(600):
                     if hasattr(self, "check_pause"):
                         self.check_pause()
                     if not self.is_running:
                         return False
                     time.sleep(1)
+            
                 self.log("10 分钟冷却完毕，交给外层执行重启流程。")
                 return False
 
@@ -2850,7 +3143,106 @@ class FH_UltimateBot(ctk.CTk):
             self.scaled_template_cache.clear()
             self.load_template_file_cache()
 
+    def get_forza_hwnd(self):
+        try:
+            return win32gui.FindWindow(None, "Forza Horizon 6")
+        except Exception:
+            return None
+
+
+    def capture_forza_window_printwindow(self):
+        try:
+            import win32ui
+            import win32con
+
+            hwnd = self.get_forza_hwnd()
+            if not hwnd:
+                self.log("PrintWindow 캡처 실패: 포르자 창을 찾지 못함")
+                return None
+
+            # 최소화 상태면 캡처 실패 가능성이 높음
+            if win32gui.IsIconic(hwnd):
+                self.log("PrintWindow 캡처 실패: 포르자 창이 최소화 상태입니다.")
+                return None
+
+            left, top, right, bottom = win32gui.GetClientRect(hwnd)
+            width = right - left
+            height = bottom - top
+
+            if width <= 0 or height <= 0:
+                return None
+
+            hwnd_dc = win32gui.GetWindowDC(hwnd)
+            mfc_dc = win32ui.CreateDCFromHandle(hwnd_dc)
+            save_dc = mfc_dc.CreateCompatibleDC()
+
+            bitmap = win32ui.CreateBitmap()
+            bitmap.CreateCompatibleBitmap(mfc_dc, width, height)
+            save_dc.SelectObject(bitmap)
+
+            # 3 = PW_RENDERFULLCONTENT, 일부 앱에서 더 잘 됨
+            result = ctypes.windll.user32.PrintWindow(hwnd, save_dc.GetSafeHdc(), 3)
+
+            bmpinfo = bitmap.GetInfo()
+            bmpstr = bitmap.GetBitmapBits(True)
+
+            img = Image.frombuffer(
+                "RGB",
+                (bmpinfo["bmWidth"], bmpinfo["bmHeight"]),
+                bmpstr,
+                "raw",
+                "BGRX",
+                0,
+                1
+            )
+
+            win32gui.DeleteObject(bitmap.GetHandle())
+            save_dc.DeleteDC()
+            mfc_dc.DeleteDC()
+            win32gui.ReleaseDC(hwnd, hwnd_dc)
+
+            if result != 1:
+                return None
+
+            return cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+
+        except Exception as e:
+            self.log(f"PrintWindow 캡처 예외: {e}")
+            return None
+
     def capture_region(self, region=None, mask_areas=None):
+        # Win32 입력 모드일 때는 포르자 창 자체 캡처를 먼저 시도
+        if getattr(self, "use_win32_input", False):
+            screen_bgr = self.capture_forza_window_printwindow()
+
+            if screen_bgr is not None:
+                # region이 있으면 전체 포르자 클라이언트 화면 기준으로 잘라냄
+                if region:
+                    gx, gy, gw, gh = self.regions["全界面"]
+                    rx, ry, rw, rh = region
+
+                    x1 = max(0, int(rx - gx))
+                    y1 = max(0, int(ry - gy))
+                    x2 = min(screen_bgr.shape[1], x1 + int(rw))
+                    y2 = min(screen_bgr.shape[0], y1 + int(rh))
+
+                    if x2 > x1 and y2 > y1:
+                        screen_bgr = screen_bgr[y1:y2, x1:x2]
+
+                if mask_areas:
+                    for rect in mask_areas:
+                        try:
+                            mx1, my1, mx2, my2 = rect
+                            mx1 = max(0, int(mx1))
+                            my1 = max(0, int(my1))
+                            mx2 = min(screen_bgr.shape[1], int(mx2))
+                            my2 = min(screen_bgr.shape[0], int(my2))
+                            if mx2 > mx1 and my2 > my1:
+                                screen_bgr[my1:my2, mx1:mx2] = 0
+                        except Exception:
+                            pass
+
+                return screen_bgr
         try:
             if region:
                 x, y, w, h = region
@@ -3083,8 +3475,8 @@ class FH_UltimateBot(ctk.CTk):
             return None
 
         try:
-            screen = pyautogui.screenshot(region=region)
-            screen_gray = cv2.cvtColor(np.array(screen), cv2.COLOR_RGB2GRAY)
+            screen_bgr = self.capture_region(region)
+            screen_gray = cv2.cvtColor(screen_bgr, cv2.COLOR_BGR2GRAY)
 
             main_tpl = self.load_template_gray(main_path)
             sub_tpl = self.load_template_gray(sub_path)
@@ -3260,8 +3652,8 @@ class FH_UltimateBot(ctk.CTk):
             return None
 
         try:
-            screen = pyautogui.screenshot(region=region)
-            screen_gray = cv2.cvtColor(np.array(screen), cv2.COLOR_RGB2GRAY)
+            screen_bgr = self.capture_region(region)
+            screen_gray = cv2.cvtColor(screen_bgr, cv2.COLOR_BGR2GRAY)
 
             main_tpl = self.load_template_gray(main_path)
             sub_tpl = self.load_template_gray(sub_path)
@@ -4496,16 +4888,18 @@ class FH_UltimateBot(ctk.CTk):
                 self.log("该车辆技能已点过，跳过计数")
             else:
                 time.sleep(1.0)
-                self.hw_press("enter")
-                time.sleep(1.5)
+                self.hw_press("enter", delay=0.25)
+                time.sleep(2.0)
 
                 for dk in self.config["skill_dirs"]:
                     if not self.is_running:
                         return False
-                    self.hw_press(dk)
-                    time.sleep(0.2)
-                    self.hw_press("enter")
-                    time.sleep(1.2)
+
+                    self.hw_press(dk, delay=0.25)
+                    time.sleep(0.45)
+
+                    self.hw_press("enter", delay=0.25)
+                    time.sleep(1.35)
 
                 spne_found = self.find_image_gray("SPNE.png", region=self.regions["全界面"], threshold=0.70)
                 
