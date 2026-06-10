@@ -91,7 +91,7 @@ CACHE_DIR = os.path.join(APP_DIR, "cache")
 TEMPLATE_CACHE_FILE = os.path.join(CACHE_DIR, "template_cache.pkl")
 TEMPLATE_META_FILE = os.path.join(CACHE_DIR, "template_meta.json")
 CURRENT_VERSION = "1.1.6.2"
-CURRENT_VERSION_KR = "3"
+CURRENT_VERSION_KR = "4"
 def auto_extract_configs():
     os.makedirs(CONFIG_DIR, exist_ok=True)
     
@@ -3569,7 +3569,7 @@ class FH_UltimateBot(ctk.CTk):
                     center_score = self.match_template_score(roi_center, tpl_center)
 
                     # 标签匹配 (NEW 标签或作者点赞标签)
-                    pad = 5
+                    pad = 80
                     sub_roi = screen_bgr[
                         max(0, y - pad):min(screen_bgr.shape[0], y + h_m + pad),
                         max(0, x - pad):min(screen_bgr.shape[1], x + w_m + pad),
@@ -3691,7 +3691,22 @@ class FH_UltimateBot(ctk.CTk):
             if pos:
                 return pos
 
+            time.sleep(0.15)
+            pos = self.find_image_with_element_multi(
+                main_path=main_path,
+                sub_path=sub_path,
+                region=region,
+                fast_mode=fast_mode,
+                main_threshold=main_threshold,
+                like_threshold=like_threshold,
+                final_threshold=final_threshold
+            )
+            if pos:
+                self.log(f"[RetryMatch] 재탐색 성공: {main_path}+{sub_path}")
+                return pos
+
             sleep_end = time.time() + interval
+
             while self.is_running and time.time() < sleep_end:
                 time.sleep(0.05)
 
@@ -4057,23 +4072,142 @@ class FH_UltimateBot(ctk.CTk):
             if pos:
                 return pos
             
+            time.sleep(0.15)
+            pos = self.find_any_image_gray(image_list, region=region, threshold=threshold, fast_mode=fast_mode, invert_mode=invert_mode)
+            if pos:
+                self.log(f"[RetryMatch] 재탐색 성공: {image_list}")
+                return pos
+
             # 安全等待机制，防止卡死
             sleep_end = time.time() + interval
             while self.is_running and time.time() < sleep_end:
                 time.sleep(0.05)
         return None
+    
     def wait_for_image_gray(self, template_path, region=None, threshold=0.75, timeout=30, interval=0.3, fast_mode=True, invert_mode=False):
-        """等待单张灰度图出现（已补全 fast_mode 参数）"""
         start = time.time()
+
         while self.is_running and time.time() - start < timeout:
             pos = self.find_image_gray(template_path, region=region, threshold=threshold, fast_mode=fast_mode, invert_mode=invert_mode)
             if pos:
                 return pos
-            
-            # 安全等待机制
+
+            time.sleep(0.15)
+            pos = self.find_image_gray(template_path, region=region, threshold=threshold, fast_mode=fast_mode, invert_mode=invert_mode)
+            if pos:
+                self.log(f"[RetryMatch] 재탐색 성공: {template_path}")
+                return pos
+
             sleep_end = time.time() + interval
             while self.is_running and time.time() < sleep_end:
                 time.sleep(0.05)
+
+        return None
+    
+    def click_and_confirm_disappear(
+        self,
+        pos,
+        old_image,
+        region=None,
+        threshold=0.75,
+        timeout=3,
+        retry_click=True,
+        double=False
+    ):
+        if not pos:
+            return False
+
+        # 1차 클릭
+        self.game_click(pos, double=double)
+        time.sleep(0.4)
+
+        # 이전 이미지가 사라졌는지 확인
+        start = time.time()
+        while self.is_running and time.time() - start < timeout:
+            still_pos = self.find_image_gray(
+                old_image,
+                region=region,
+                threshold=threshold,
+                fast_mode=True
+            )
+
+            if not still_pos:
+                self.log(f"[ClickConfirm] 화면 전환 확인: {old_image} 사라짐")
+                return True
+
+            time.sleep(0.2)
+
+        # 아직 이전 이미지가 보이면 클릭 실패 가능성
+        if retry_click:
+            self.log(f"[ClickConfirm] {old_image} 아직 보임. 같은 위치 재클릭")
+            self.game_click(pos, double=double)
+            time.sleep(0.5)
+
+            # 재클릭 후 한 번 더 확인
+            start = time.time()
+            while self.is_running and time.time() - start < timeout:
+                still_pos = self.find_image_gray(
+                    old_image,
+                    region=region,
+                    threshold=threshold,
+                    fast_mode=True
+                )
+
+                if not still_pos:
+                    self.log(f"[ClickConfirm] 재클릭 후 화면 전환 확인: {old_image}")
+                    return True
+
+                time.sleep(0.2)
+
+        self.log(f"[ClickConfirm] 클릭 후에도 {old_image}가 남아 있음")
+        return False
+    
+    def click_and_wait_next(
+        self,
+        pos,
+        next_images,
+        next_region=None,
+        next_threshold=0.75,
+        timeout=5,
+        retry_times=2,
+        double=False,
+        gray=True
+    ):
+        if not pos:
+            return None
+
+        if isinstance(next_images, str):
+            next_images = [next_images]
+
+        for attempt in range(retry_times + 1):
+            self.game_click(pos, double=double)
+            time.sleep(0.5)
+
+            if gray:
+                next_pos = self.wait_for_any_image_gray(
+                    next_images,
+                    region=next_region,
+                    threshold=next_threshold,
+                    timeout=timeout,
+                    interval=0.25,
+                    fast_mode=True
+                )
+            else:
+                next_pos = self.wait_for_any_image(
+                    next_images,
+                    region=next_region,
+                    threshold=next_threshold,
+                    timeout=timeout,
+                    interval=0.25,
+                    fast_mode=True
+                )
+
+            if next_pos:
+                self.log(f"[NextConfirm] 다음 화면 확인 성공: {next_images}")
+                return next_pos
+
+            self.log(f"[NextConfirm] 다음 화면 미확인. 클릭 재시도 {attempt + 1}/{retry_times}")
+
         return None
 
     def find_any_image_transparent(self, image_list, region=None, threshold=0.70, fast_mode=True):
@@ -4140,7 +4274,9 @@ class FH_UltimateBot(ctk.CTk):
 
         while self.is_running and time.time() - start < timeout:
             try:
+                # 1차 탐색
                 screen_bgr = self.capture_region(region)
+
                 for img_path in image_list:
                     pos = self.find_image_in_screen(
                         screen_bgr,
@@ -4151,6 +4287,23 @@ class FH_UltimateBot(ctk.CTk):
                     )
                     if pos:
                         return pos
+
+                # 2차 재탐색: 화면을 새로 캡처해서 다시 검사
+                time.sleep(0.15)
+                screen_bgr = self.capture_region(region)
+
+                for img_path in image_list:
+                    pos = self.find_image_in_screen(
+                        screen_bgr,
+                        img_path,
+                        region=region,
+                        threshold=threshold,
+                        fast_mode=fast_mode
+                    )
+                    if pos:
+                        self.log(f"[RetryMatch] 재탐색 성공: {img_path}")
+                        return pos
+
             except Exception as e:
                 self.log(f"wait_for_any_image 异常: {e}")
 
@@ -4240,23 +4393,35 @@ class FH_UltimateBot(ctk.CTk):
             self.log("未找到 eventlab")
             return False
 
-        self.game_click(pos_el)
-        time.sleep(1.2)
-
-        pos_yg = self.wait_for_image_gray(
+        pos_yg = self.click_and_wait_next(
+            pos_el,
             "playenent.png",
-            region=self.regions["中间"],
-            threshold=0.75,
-            timeout=40,
-            interval=0.3,
-            fast_mode=True
+            next_region=self.regions["中间"],
+            next_threshold=0.75,
+            timeout=8,
+            retry_times=2,
+            double=False,
+            gray=True
         )
+        
         if not pos_yg:
             self.log("未找到游玩赛事")
             return False
 
-        self.game_click(pos_yg)
-        time.sleep(1.5)
+        pos_ck = self.click_and_wait_next(
+            pos_yg,
+            "VEI.png",
+            next_region=self.regions["下"],
+            next_threshold=0.75,
+            timeout=20,
+            retry_times=2,
+            double=False,
+            gray=True
+        )
+
+        if not pos_ck:
+            self.log("链接超时")
+            return False
 
         race_mode = 1
         if hasattr(self, "opt_race_mode"):
@@ -4338,19 +4503,7 @@ class FH_UltimateBot(ctk.CTk):
                 self.hw_press("pagedown", delay=0.12)
                 time.sleep(0.25)
             time.sleep(1.5)
-
-        pos_ck = self.wait_for_image_gray(
-            "VEI.png",
-            region=self.regions["下"],
-            threshold=0.75,
-            timeout=20,
-            interval=1.0,
-            fast_mode=True
-        )
-        if not pos_ck:
-            self.log("链接超时")
-            return False
-
+        
         self.hw_press("enter")
         time.sleep(2.0)
         self.hw_press("enter")
@@ -4369,59 +4522,110 @@ class FH_UltimateBot(ctk.CTk):
         )
 
         if not pos_target:
-            self.log("未找到带 liketag 的目标车辆，重新选品牌...")
-            self.hw_press("backspace")
-            time.sleep(1.2)
+            self.log("목표 차량을 찾지 못했습니다. 즐겨찾기 차량 목록으로 진입 후 재탐색합니다.")
 
-            found_brand = False
-            for _ in range(3):
-                if not self.is_running:
+            # 1차: 즐겨찾기 진입
+            self.hw_press("y")
+            time.sleep(0.5)
+            self.hw_press("enter")
+            time.sleep(0.8)
+            self.hw_press("esc")
+            time.sleep(1.0)
+
+            # 즐겨찾기에서 차량 재탐색
+            pos_target = self.wait_for_image_with_element_multi(
+                "skillcar.png",
+                "liketag.png",
+                region=self.regions["全界面"],
+                fast_mode=True,
+                main_threshold=0.75,
+                like_threshold=0.7,
+                final_threshold=0.7,
+                timeout=2,
+                interval=0.25
+            )
+
+            # 2차: 그래도 없으면 브랜드 찾기
+            if not pos_target:
+                self.log("즐겨찾기에서도 목표 차량을 찾지 못했습니다. 브랜드 목록으로 이동합니다.")
+
+                self.hw_press("backspace")
+                time.sleep(1.2)
+
+                brand_pos = self.wait_for_any_image_gray(
+                    ["CCbrand.png", "CCbrand-b.png"],
+                    region=self.regions["全界面"],
+                    threshold=0.75,
+                    timeout=3,
+                    interval=0.25,
+                    fast_mode=True
+                )
+
+                if not brand_pos:
+                    self.log("CCbrand.png / CCbrand-b.png를 찾지 못했습니다.")
                     return False
 
-                pos_brand = self.wait_for_image_gray("skillcarbrand.png", region=self.regions["全界面"], threshold=0.8, timeout=1.2, interval=0.2, fast_mode=True)
-                if pos_brand:
-                    self.game_click(pos_brand)
-                    time.sleep(1.2)
-                    found_brand = True
-                    break
+                self.game_click(brand_pos)
+                time.sleep(1.0)
 
-                self.hw_press("up")
-                time.sleep(0.4)
-
-            if not found_brand:
-                self.log("三次尝试未找到刷图车辆品牌。")
-                return False
-
-            for _ in range(20):
-                if not self.is_running:
-                    return False
-
+                # 브랜드 진입 후 차량 재탐색
                 pos_target = self.wait_for_image_with_element_multi(
                     "skillcar.png",
                     "liketag.png",
                     region=self.regions["全界面"],
+                    fast_mode=True,
                     main_threshold=0.75,
                     like_threshold=0.7,
                     final_threshold=0.7,
                     timeout=2,
-                    interval=0.25,
-                    fast_mode=True
+                    interval=0.25
                 )
-                if pos_target:
-                    break
 
-                for _ in range(4):
-                    self.hw_press("right", delay=0.08)
-                    time.sleep(0.08)
-                time.sleep(0.4)
+            if not pos_target:
+                for _ in range(20):
+                    if not self.is_running:
+                        return False
+
+                    pos_target = self.wait_for_image_with_element_multi(
+                        "skillcar.png",
+                        "liketag.png",
+                        region=self.regions["全界面"],
+                        main_threshold=0.75,
+                        like_threshold=0.7,
+                        final_threshold=0.7,
+                        timeout=2,
+                        interval=0.25,
+                        fast_mode=True
+                    )
+                    if pos_target:
+                        break
+                    
+                    for _ in range(4):
+                        self.hw_press("right", delay=0.08)
+                        time.sleep(0.08)
+                    time.sleep(0.4)
 
         if not pos_target:
             self.log("翻页未能找到带有 liketag 的刷图车辆！")
             return False
 
-        self.game_click(pos_target)
-        time.sleep(0.5)
-        self.hw_press("enter")
+        self.game_click(pos_target, double=False)
+        time.sleep(1.2)
+        
+        self.hw_press("enter", delay=0.2)
+        time.sleep(3.0)
+        
+        still_car = self.find_image_gray(
+            "skillcar.png",
+            region=self.regions["全界面"],
+            threshold=0.65,
+            fast_mode=True
+        )
+        
+        if still_car:
+            self.log("Enter 후에도 차량 선택 화면이 남아 있습니다. 차량 탑승 실패로 판단합니다.")
+            return False
+        
         time.sleep(4.0)
 
         self.log("前置完成，开始循环跑图！")
@@ -4855,61 +5059,76 @@ class FH_UltimateBot(ctk.CTk):
             if pos_rc:
                 self.log("点击上车")
                 self.game_click(pos_rc)
-                time.sleep(2.0)  # 点击后等待上车加载
+                time.sleep(2.0)  # 차량 탑승 로딩 대기 증가
             else:
                 self.log("回车上车")
                 self.hw_press("enter")
-                time.sleep(1.0)
+                time.sleep(2.0)
                 self.hw_press("enter")
-                time.sleep(1.0)
-
-
+                time.sleep(2.5)
+            
+            # 차량 탑승 컷씬/로딩 대기
+            time.sleep(8.0)
+            
             pos_sjy = None
-            for _ in range(20):
+            self.log("차량 탑승 후 메뉴 진입을 시도합니다.")
+            
+            for esc_try in range(3):
                 if not self.is_running:
                     return False
-
-                pos_sjy = self.find_any_image_gray(["UandT-w.png", "UandT-b.png"], region=self.regions["左下"], threshold=0.70)
+            
+                self.log(f"차량 탑승 후 ESC 메뉴 열기 시도 {esc_try + 1}/3")
+                self.hw_press("esc", delay=0.2)
+                time.sleep(2.0)
+            
+                pos_sjy = self.wait_for_any_image_gray(
+                    ["UandT-w.png", "UandT-b.png"],
+                    region=self.regions["左下"],
+                    threshold=0.70,
+                    timeout=6,
+                    interval=0.5,
+                    fast_mode=True
+                )
+            
                 if pos_sjy:
                     break
-
-                self.hw_press("esc")
-                time.sleep(0.5)
 
             if not pos_sjy:
                 self.log("找不到升级页面")
                 return False
 
-            self.game_click(pos_sjy)
-            time.sleep(0.5)
-
-            pos_cls = self.wait_for_any_image_gray(
+            pos_cls = self.click_and_wait_next(
+                pos_sjy,
                 ["clsldcnw.png", "clsldcnb.png"],
-                region=self.regions["左下"],
-                threshold=0.70,
-                timeout=20
+                next_region=self.regions["左下"],
+                next_threshold=0.70,
+                timeout=10,
+                retry_times=2,
+                double=False,
+                gray=True
             )
+            
             if not pos_cls:
                 self.log("未找到车辆熟练度")
                 return False
             self.game_click(pos_cls)
-            time.sleep(1.5)
-
+            time.sleep(0.8)
+            
             pos_exp = self.wait_for_any_image(
                 ["EXPwU.png"],
                 region=self.regions["左"],
                 threshold=0.75,
-                timeout=1.5,
-                interval=0.3,
+                timeout=0.9,
+                interval=0.25,
                 fast_mode=True
             )
-
+            
             if pos_exp:
                 self.log("该车辆技能已点过，跳过计数")
             else:
-                time.sleep(1.0)
+                time.sleep(0.5)
                 self.hw_press("enter", delay=0.25)
-                time.sleep(2.0)
+                time.sleep(1.2)
 
                 for dk in self.config["skill_dirs"]:
                     if not self.is_running:
