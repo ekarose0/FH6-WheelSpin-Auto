@@ -91,7 +91,7 @@ CACHE_DIR = os.path.join(APP_DIR, "cache")
 TEMPLATE_CACHE_FILE = os.path.join(CACHE_DIR, "template_cache.pkl")
 TEMPLATE_META_FILE = os.path.join(CACHE_DIR, "template_meta.json")
 CURRENT_VERSION = "1.1.6.2"
-CURRENT_VERSION_KR = "4"
+CURRENT_VERSION_KR = "4.1"
 def auto_extract_configs():
     os.makedirs(CONFIG_DIR, exist_ok=True)
     
@@ -862,6 +862,7 @@ class FH_UltimateBot(ctk.CTk):
             "auto_restart": False,
             "restart_cmd": "start steam://run/2483190", 
             "race_mode": 1,
+            "race_car_mode": 1,
             "sell_mode": 1,
             "ui_language": DEFAULT_UI_LANGUAGE,
             "ocr_lang": "한국어",
@@ -906,6 +907,8 @@ class FH_UltimateBot(ctk.CTk):
             self.config["next_4"] = int(self.entry_next4.get())
             if hasattr(self, "opt_race_mode"):
                 self.config["race_mode"] = self.race_mode_values.get(self.opt_race_mode.get(), 1)
+            if hasattr(self, "opt_race_car_mode"):
+                self.config["race_car_mode"] = self.race_car_mode_values.get(self.opt_race_car_mode.get(), 1)
             if hasattr(self, "opt_sell_mode"):
                 val = self.opt_sell_mode.get()
                 mode_values = getattr(self, "sell_mode_values", {})
@@ -1118,28 +1121,59 @@ class FH_UltimateBot(ctk.CTk):
         self.entry_share.pack(pady=4)
 
         self.race_mode_values = {
-            "모드 1: 공유코드 입력": 1,
-            "모드 2: 첫번째 즐겨찾기 맵 사용": 2,
-            "모드 3: 마지막 플레이 맵 사용": 3,
+            "맵 선택 모드 1: 공유코드 입력": 1,
+            "맵 선택 모드 2: 첫번째 즐겨찾기 맵 사용": 2,
+            "맵 선택 모드 3: 마지막 플레이 맵 사용": 3,
         }
 
         self.opt_race_mode = ctk.CTkOptionMenu(
             box_race,
             values=list(self.race_mode_values.keys()),
-            width=190,
-            height=28,
+            width=170,
+            height=20,
+            corner_radius=8,
+            font=ctk.CTkFont(size=12),
+            fg_color="#2563EB",
+            button_color="#1D4ED8",
+            button_hover_color="#1E40AF",
         )
         
         saved_race_mode = self.config.get("race_mode", 1)
 
         if saved_race_mode == 2:
-            self.opt_race_mode.set("모드 2: 첫번째 즐겨찾기 맵 사용")
+            self.opt_race_mode.set("맵 선택 모드 2: 첫번째 즐겨찾기 맵 사용")
         elif saved_race_mode == 3:
-            self.opt_race_mode.set("모드 3: 마지막 플레이 맵 사용")
+            self.opt_race_mode.set("맵 선택 모드 3: 마지막 플레이 맵 사용")
         else:
-            self.opt_race_mode.set("모드 1: 공유코드 입력")
+            self.opt_race_mode.set("맵 선택 모드 1: 공유코드 입력")
 
         self.opt_race_mode.pack(pady=4)
+
+        self.race_car_mode_values = {
+            "차량 모드 1: 이미지 탐색 차량 탑승": 1,
+            "차량 모드 2: 즐겨찾기 차량 바로 탑승": 2,
+        }
+
+        self.opt_race_car_mode = ctk.CTkOptionMenu(
+            box_race,
+            values=list(self.race_car_mode_values.keys()),
+            width=170,
+            height=20,
+            corner_radius=8,
+            font=ctk.CTkFont(size=12),
+            fg_color="#7C3AED",
+            button_color="#6D28D9",
+            button_hover_color="#5B21B6",
+        )
+
+        saved_race_car_mode = self.config.get("race_car_mode", 1)
+
+        if saved_race_car_mode == 2:
+            self.opt_race_car_mode.set("차량 모드 2: 즐겨찾기 차량 바로 탑승")
+        else:
+            self.opt_race_car_mode.set("차량 모드 1: 이미지 탐색 차량 탑승")
+
+        self.opt_race_car_mode.pack(pady=4)
 
         self.next_frame1, self.entry_next1, self.chk1 = create_next_step(
             self.config_frame, self.var_chk1, self.config.get("next_1", 2)
@@ -4509,30 +4543,28 @@ class FH_UltimateBot(ctk.CTk):
         self.hw_press("enter")
         time.sleep(2.0)
 
-        pos_target = self.wait_for_image_with_element_multi(
-            "skillcar.png",
-            "liketag.png",
-            region=self.regions["全界面"],
-            fast_mode=True,
-            main_threshold=0.75,
-            like_threshold=0.7,
-            final_threshold=0.7,
-            timeout=2,
-            interval=0.25
-        )
-
-        if not pos_target:
-            self.log("목표 차량을 찾지 못했습니다. 즐겨찾기 차량 목록으로 진입 후 재탐색합니다.")
-
-            # 1차: 즐겨찾기 진입
+        race_car_mode = 1
+        if hasattr(self, "opt_race_car_mode"):
+            race_car_mode = self.race_car_mode_values.get(self.opt_race_car_mode.get(), 1)
+        
+        if race_car_mode == 2:
+            self.log("레이스 차량 모드 2: 즐겨찾기 차량 바로 탑승을 시도합니다.")
+        
             self.hw_press("y")
-            time.sleep(0.5)
+            time.sleep(0.6)
+        
             self.hw_press("enter")
-            time.sleep(0.8)
-            self.hw_press("esc")
-            time.sleep(1.0)
+            time.sleep(1.2)
 
-            # 즐겨찾기에서 차량 재탐색
+            self.hw_press("esc")
+            time.sleep(1.2)
+        
+            self.log("즐겨찾기 차량 선택 완료. 차량 탑승 Enter를 입력합니다.")
+        
+            self.hw_press("enter", delay=0.2)
+            time.sleep(4.0)
+        
+        else:
             pos_target = self.wait_for_image_with_element_multi(
                 "skillcar.png",
                 "liketag.png",
@@ -4544,31 +4576,17 @@ class FH_UltimateBot(ctk.CTk):
                 timeout=2,
                 interval=0.25
             )
-
-            # 2차: 그래도 없으면 브랜드 찾기
+        
             if not pos_target:
-                self.log("즐겨찾기에서도 목표 차량을 찾지 못했습니다. 브랜드 목록으로 이동합니다.")
-
-                self.hw_press("backspace")
-                time.sleep(1.2)
-
-                brand_pos = self.wait_for_any_image_gray(
-                    ["CCbrand.png", "CCbrand-b.png"],
-                    region=self.regions["全界面"],
-                    threshold=0.75,
-                    timeout=3,
-                    interval=0.25,
-                    fast_mode=True
-                )
-
-                if not brand_pos:
-                    self.log("CCbrand.png / CCbrand-b.png를 찾지 못했습니다.")
-                    return False
-
-                self.game_click(brand_pos)
+                self.log("목표 차량을 찾지 못했습니다. 즐겨찾기 차량 목록으로 진입 후 재탐색합니다.")
+        
+                self.hw_press("y")
+                time.sleep(0.5)
+                self.hw_press("enter")
+                time.sleep(0.8)
+                self.hw_press("esc")
                 time.sleep(1.0)
-
-                # 브랜드 진입 후 차량 재탐색
+        
                 pos_target = self.wait_for_image_with_element_multi(
                     "skillcar.png",
                     "liketag.png",
@@ -4580,54 +4598,89 @@ class FH_UltimateBot(ctk.CTk):
                     timeout=2,
                     interval=0.25
                 )
-
-            if not pos_target:
-                for _ in range(20):
-                    if not self.is_running:
+        
+                if not pos_target:
+                    self.log("즐겨찾기에서도 목표 차량을 찾지 못했습니다. 브랜드 목록으로 이동합니다.")
+        
+                    self.hw_press("backspace")
+                    time.sleep(1.2)
+        
+                    brand_pos = self.wait_for_any_image_gray(
+                        ["CCbrand.png", "CCbrand-b.png"],
+                        region=self.regions["全界面"],
+                        threshold=0.75,
+                        timeout=3,
+                        interval=0.25,
+                        fast_mode=True
+                    )
+        
+                    if not brand_pos:
+                        self.log("CCbrand.png / CCbrand-b.png를 찾지 못했습니다.")
                         return False
-
+        
+                    self.game_click(brand_pos)
+                    time.sleep(1.0)
+        
                     pos_target = self.wait_for_image_with_element_multi(
                         "skillcar.png",
                         "liketag.png",
                         region=self.regions["全界面"],
+                        fast_mode=True,
                         main_threshold=0.75,
                         like_threshold=0.7,
                         final_threshold=0.7,
                         timeout=2,
-                        interval=0.25,
-                        fast_mode=True
+                        interval=0.25
                     )
-                    if pos_target:
-                        break
-                    
-                    for _ in range(4):
-                        self.hw_press("right", delay=0.08)
-                        time.sleep(0.08)
-                    time.sleep(0.4)
-
-        if not pos_target:
-            self.log("翻页未能找到带有 liketag 的刷图车辆！")
-            return False
-
-        self.game_click(pos_target, double=False)
-        time.sleep(1.2)
         
-        self.hw_press("enter", delay=0.2)
-        time.sleep(3.0)
+                if not pos_target:
+                    for _ in range(20):
+                        if not self.is_running:
+                            return False
         
-        still_car = self.find_image_gray(
-            "skillcar.png",
-            region=self.regions["全界面"],
-            threshold=0.65,
-            fast_mode=True
-        )
+                        pos_target = self.wait_for_image_with_element_multi(
+                            "skillcar.png",
+                            "liketag.png",
+                            region=self.regions["全界面"],
+                            main_threshold=0.75,
+                            like_threshold=0.7,
+                            final_threshold=0.7,
+                            timeout=2,
+                            interval=0.25,
+                            fast_mode=True
+                        )
         
-        if still_car:
-            self.log("Enter 후에도 차량 선택 화면이 남아 있습니다. 차량 탑승 실패로 판단합니다.")
-            return False
+                        if pos_target:
+                            break
+                        
+                        for _ in range(4):
+                            self.hw_press("right", delay=0.08)
+                            time.sleep(0.08)
+                        time.sleep(0.4)
         
-        time.sleep(4.0)
-
+            if not pos_target:
+                self.log("翻页未能找到带有 liketag 的刷图车辆！")
+                return False
+        
+            self.game_click(pos_target, double=False)
+            time.sleep(1.2)
+        
+            self.hw_press("enter", delay=0.2)
+            time.sleep(3.0)
+        
+            still_car = self.find_image_gray(
+                "skillcar.png",
+                region=self.regions["全界面"],
+                threshold=0.65,
+                fast_mode=True
+            )
+        
+            if still_car:
+                self.log("Enter 후에도 차량 선택 화면이 남아 있습니다. 차량 탑승 실패로 판단합니다.")
+                return False
+        
+            time.sleep(4.0)
+        
         self.log("前置完成，开始循环跑图！")
 
         while self.race_counter < target_count:
