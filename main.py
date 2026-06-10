@@ -858,7 +858,7 @@ class FH_UltimateBot(ctk.CTk):
             "next_4": 1,
             "global_loops": 10, 
             "skill_dirs": ["right", "up", "up", "up", "left"],
-            "share_code": "100405213", 
+            "share_code": "726355095", 
             "auto_restart": False,
             "restart_cmd": "start steam://run/2483190", 
             "race_mode": 1,
@@ -1974,6 +1974,19 @@ class FH_UltimateBot(ctk.CTk):
             if not hwnd:
                 self.log("포르자 창을 찾지 못함")
                 return False
+            
+            try:
+                client_rect = win32gui.GetClientRect(hwnd)
+                client_origin = win32gui.ClientToScreen(hwnd, (0, 0))
+
+                gx, gy = client_origin
+                gw = client_rect[2]
+                gh = client_rect[3]
+
+                if gw > 1000 and gh > 600:
+                    self.update_regions_by_window(gx, gy, gw, gh)
+            except Exception:
+                pass
 
             # 화면 절대좌표 → 포르자 클라이언트 내부 좌표
             x, y = int(pos[0]), int(pos[1])
@@ -2020,21 +2033,21 @@ class FH_UltimateBot(ctk.CTk):
 
         time.sleep(0.3)
 
-        def move_to_game_coord(self, x, y):
-            """
-            기존 물리 입력 모드에서만 마우스를 치우는 함수입니다.
-            Win32 백그라운드 입력 모드에서는 실제 마우스를 움직이지 않습니다.
-            """
-            if getattr(self, "use_win32_input", False):
-                return
-        
-            try:
-                gx, gy, gw, gh = self.regions["全界面"]
-                abs_x = gx + x
-                abs_y = gy + y
-                self.hw_mouse_move(abs_x, abs_y)
-            except Exception:
-                self.hw_mouse_move(x, y)
+    def move_to_game_coord(self, x, y):
+        """
+        기존 물리 입력 모드에서만 마우스를 치우는 함수입니다.
+        Win32 백그라운드 입력 모드에서는 실제 마우스를 움직이지 않습니다.
+        """
+        if getattr(self, "use_win32_input", False):
+            return
+    
+        try:
+            gx, gy, gw, gh = self.regions["全界面"]
+            abs_x = gx + x
+            abs_y = gy + y
+            self.hw_mouse_move(abs_x, abs_y)
+        except Exception:
+            self.hw_mouse_move(x, y)
 
     def add_skill_dir(self, direction):
         self.config["skill_dirs"].append(direction)
