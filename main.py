@@ -92,7 +92,7 @@ CACHE_DIR = os.path.join(APP_DIR, "cache")
 TEMPLATE_CACHE_FILE = os.path.join(CACHE_DIR, "template_cache.pkl")
 TEMPLATE_META_FILE = os.path.join(CACHE_DIR, "template_meta.json")
 CURRENT_VERSION = "1.1.6.2"
-CURRENT_VERSION_KR = "4.2"
+CURRENT_VERSION_KR = "4.3"
 def auto_extract_configs():
     os.makedirs(CONFIG_DIR, exist_ok=True)
     
@@ -896,17 +896,56 @@ class FH_UltimateBot(ctk.CTk):
     
     def load_user_image_config(self):
         default_config = {
-            "_comment_1": "레이스 차량 탐색 범위 (기본값 80, 값이 클수록 liketag.png로부터 skillcar.png까지의 간격을 더 넓게 탐색합니다)",
+            "_comment_race_car_search_range": 
+                "레이스 차량 탐색 범위, 값이 클수록 liketag.png로부터 skillcar.png까지의 간격을 더 넓게 탐색합니다(기본값 80)",
             "race_car_search_range": 80,
 
-            "_comment_2": "신규 차량 탐색 범위 (기본값 5, 값이 클수록 newcartag.png로부터 newCC.png까지의 간격을 더 넓게 탐색합니다)",
-            "new_car_search_range": 5
+            "_comment_new_car_search_range": 
+                "신규 차량 탐색 범위, 값이 클수록 newcartag.png로부터 newCC.png까지의 간격을 더 넓게 탐색합니다(기본값 5)",
+            "new_car_search_range": 5,
+
+            "_comment_new_car_start_right_count": 
+                "신규 차량 탐색 시작 전 오른쪽 방향키를 몇 번 누를지 설정합니다. 0이면 처음부터 탐색합니다. 예: 3 = 오른쪽 3번 누른뒤 화면 탐색(기본값 0)",
+            "new_car_start_right_count": 0,
+
+            "_comment_car_enter_wait":
+                "차량 탑승 후 ESC 메뉴 진입 전 대기시간(초) (기본값 6)",
+            "car_enter_wait": 6,
+
+            "_comment_new_car_max_search_count":
+                "신규 차량 탐색 최대 횟수입니다. 너무 크면 차량이 없을 때 오래 탐색합니다.(85)",
+            "new_car_max_search_count": 85,
+
+            "_comment_brand_search_settings":
+                "Subaru 제조사를 찾지 못하는 경우에만 조정하세요. "
+                "threshold=낮출수록 인식이 쉬워집니다(기본 0.75). "
+                "fast_mode=true는 빠른 탐색, false는 느리지만 더 넓게 탐색합니다. [반드시 소문자 true/false 사용] "
+                "up_wait=제조사를 찾지 못했을 때 다음 제조사로 이동하기 전 대기시간(초)입니다. "
+                "(기본값: 0.75 / True / 0.25)",
+
+            "brand_search_settings": {
+                "threshold": 0.75,
+                "fast_mode": True,
+                "up_wait": 0.25
+            }
         }
 
         try:
             if not os.path.exists(USER_IMAGE_CONFIG_FILE):
+                json_text = json.dumps(
+                    default_config,
+                    indent=4,
+                    ensure_ascii=False
+                )
+
+                json_text = json_text.replace(
+                    ',\n    "_comment_',
+                    ',\n\n    "_comment_'
+                )
+
                 with open(USER_IMAGE_CONFIG_FILE, "w", encoding="utf-8") as f:
-                    json.dump(default_config, f, indent=4, ensure_ascii=False)
+                    f.write(json_text)
+
                 return default_config
 
             with open(USER_IMAGE_CONFIG_FILE, "r", encoding="utf-8") as f:
@@ -919,14 +958,47 @@ class FH_UltimateBot(ctk.CTk):
                     changed = True
 
             if changed:
+                json_text = json.dumps(
+                    user_config,
+                    indent=4,
+                    ensure_ascii=False
+                )
+            
+                json_text = json_text.replace(
+                    ',\n    "_comment_',
+                    ',\n\n    "_comment_'
+                )
+            
                 with open(USER_IMAGE_CONFIG_FILE, "w", encoding="utf-8") as f:
-                    json.dump(user_config, f, indent=4, ensure_ascii=False)
+                    f.write(json_text)
 
             return user_config
 
         except Exception:
             return default_config
+    def get_brand_search_settings(self):
+        brand_cfg = self.user_image_config.get("brand_search_settings", {})
+    
+        try:
+            threshold = float(brand_cfg.get("threshold", 0.75))
+        except Exception:
+            threshold = 0.75
         
+        try:
+            fast_mode = bool(brand_cfg.get("fast_mode", True))
+        except Exception:
+            fast_mode = True
+        
+        try:
+            up_wait = float(brand_cfg.get("up_wait", 0.25))
+        except Exception:
+            up_wait = 0.25
+    
+        threshold = max(0.50, min(threshold, 0.90))
+        up_wait = max(0.10, min(up_wait, 1.50))
+    
+        return threshold, fast_mode, up_wait
+    
     def save_config(self):
         try:
             self.config["race_count"] = int(self.entry_race.get())
@@ -4920,7 +4992,6 @@ class FH_UltimateBot(ctk.CTk):
         self.game_click(pos_collectionjournal, double=True)
         time.sleep(1.0)
 
-
         pos_masterexplorer = self.wait_for_image(
             "masterexplorer.png",
             region=self.regions["全界面"],
@@ -4954,6 +5025,8 @@ class FH_UltimateBot(ctk.CTk):
         self.hw_press("backspace")
         time.sleep(0.5)
 
+        brand_threshold, brand_fast_mode, brand_up_wait = self.get_brand_search_settings()
+
         brand_pos = None
         for _ in range(5):
             if not self.is_running:
@@ -4961,29 +5034,19 @@ class FH_UltimateBot(ctk.CTk):
                 
 
             brand_pos = self.wait_for_any_image_gray(
-                ["CCbrand.png"],
+                ["CCbrand.png", "CCbrand-b.png"],
                 region=self.regions["全界面"],
-                threshold=0.75,
+                threshold=brand_threshold,
                 timeout=0.8,
                 interval=0.2,
-                fast_mode=True
+                fast_mode=brand_fast_mode
             )
-
-            if not brand_pos:
-                brand_pos = self.wait_for_any_image_gray(
-                    ["CCbrand-b.png"],
-                    region=self.regions["全界面"],
-                    threshold=0.75,
-                    timeout=0.8,
-                    interval=0.2,
-                    fast_mode=True
-                )
 
             if brand_pos:
                 break
 
             self.hw_press("up")
-            time.sleep(0.25)
+            time.sleep(brand_up_wait)
 
         if not brand_pos:
             self.log("未找到品牌")
@@ -5101,35 +5164,27 @@ class FH_UltimateBot(ctk.CTk):
             self.hw_press("backspace")
             time.sleep(1.0)
 
+            brand_threshold, brand_fast_mode, brand_up_wait = self.get_brand_search_settings()
+
             brand_pos = None
             for _ in range(30):
                 if not self.is_running:
                     return False
 
                 brand_pos = self.wait_for_any_image_gray(
-                    ["CCbrand.png"],
+                    ["CCbrand.png", "CCbrand-b.png"],
                     region=self.regions["全界面"],
-                    threshold=0.75,
+                    threshold=brand_threshold,
                     timeout=0.8,
                     interval=0.2,
-                    fast_mode=True
+                    fast_mode=brand_fast_mode
                 )
-
-                if not brand_pos:
-                    brand_pos = self.wait_for_any_image_gray(
-                        ["CCbrand-b.png"],
-                        region=self.regions["全界面"],
-                        threshold=0.75,
-                        timeout=0.8,
-                        interval=0.2,
-                        fast_mode=True
-                    )
 
                 if brand_pos:
                     break
 
                 self.hw_press("up")
-                time.sleep(0.25)
+                time.sleep(brand_up_wait)
 
             if not brand_pos:
                 self.log("选品牌失败")
@@ -5138,12 +5193,52 @@ class FH_UltimateBot(ctk.CTk):
             self.game_click(brand_pos)
             time.sleep(1.0)
 
+            start_right_count = 0
+
+            try:
+                start_right_count = int(
+                    self.user_image_config.get(
+                        "new_car_start_right_count",
+                        0
+                    )
+                )
+            except Exception:
+                start_right_count = 0
+
+            start_right_count = max(0, min(start_right_count, 80))
+
+            if start_right_count > 0:
+                self.log(
+                    f"userconfig 설정에 따라 신규 차량 탐색 전 오른쪽으로 "
+                    f"{start_right_count}회 이동합니다."
+                )
+
+                for _ in range(start_right_count):
+                    if not self.is_running:
+                        return False
+
+                    self.hw_press("right", delay=0.08)
+                    time.sleep(0.12)
+
+                time.sleep(0.5)
+
             pos_target = None
             found_car = False
+
             current_page = 0
 
             # 항상 첫 페이지부터 순서대로 탐색
-            for _ in range(85):
+            max_search_count = max(
+                1,
+                int(
+                    self.user_image_config.get(
+                        "new_car_max_search_count",
+                        85
+                    )
+                )
+            )
+
+            for _ in range(max_search_count):
                 if not self.is_running:
                     return False
                 pos_target = self.wait_for_image_with_element_multi(
@@ -5222,7 +5317,15 @@ class FH_UltimateBot(ctk.CTk):
                 continue
             
             # 차량 탑승 컷씬/로딩 대기
-            time.sleep(6.0)
+            car_enter_wait = float(
+                self.user_image_config.get(
+                    "car_enter_wait",
+                    6
+                )
+            )
+
+            # 차량 탑승 컷씬/로딩 대기
+            time.sleep(car_enter_wait)
             
             pos_sjy = None
             self.log("차량 탑승 후 메뉴 진입을 시도합니다.")
