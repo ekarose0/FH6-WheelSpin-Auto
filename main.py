@@ -4762,10 +4762,45 @@ class FH_UltimateBot(ctk.CTk):
                 self.log("找不到赛事起点，退出跑图。")
                 return False
 
+            self.log("이벤트 시작 버튼을 클릭합니다.")
             self.game_click(pos)
-            time.sleep(4.0)
+            time.sleep(0.8)
+
+            still_start = self.wait_for_any_image_gray(
+                ["start.png", "startw.png"],
+                region=self.regions["左下"],
+                threshold=0.75,
+                timeout=2.0,
+                interval=0.25,
+                fast_mode=True
+            )
+
+            if still_start:
+                self.log("이벤트 시작 버튼이 아직 남아 있습니다. 클릭 실패로 보고 재클릭합니다.")
+                self.game_click(still_start)
+                time.sleep(1.0)
+
+                still_start = self.wait_for_any_image_gray(
+                    ["start.png", "startw.png"],
+                    region=self.regions["左下"],
+                    threshold=0.75,
+                    timeout=2.0,
+                    interval=0.25,
+                    fast_mode=True
+                )
+
+                if still_start:
+                    self.log(
+                        f"레이스 {self.race_counter + 1}/{target_count}: "
+                        f"재클릭 후에도 이벤트 시작 버튼이 남아 있어 다시 탐색합니다."
+                    )
+                    continue
+                
+            self.log("이벤트 시작 버튼이 사라졌습니다. 레이스 진입으로 판단합니다.")
+            time.sleep(0.2)
+
             self.hw_key_down("w")
-            self.hw_key_down("up") 
+            self.hw_key_down("up")
             
             # 初始化各类计时器
             race_start_time = time.time()  # 新增：记录跑图发车时间
@@ -5013,9 +5048,6 @@ class FH_UltimateBot(ctk.CTk):
             return True
 
         self.update_running_ui("超级抽奖", self.cj_counter, target_count)
-        # 【新增】：初始化记忆页码
-        if not hasattr(self, 'memory_car_page'):
-            self.memory_car_page = 0
         self.log("准备验证/进入菜单...")
         if not self.enter_menu():
             return False
@@ -5105,22 +5137,13 @@ class FH_UltimateBot(ctk.CTk):
 
             self.game_click(brand_pos)
             time.sleep(1.0)
-            jump_pages = max(0, self.memory_car_page - 1)
-            
-            if jump_pages > 0:
-                self.log(f"智能记忆触发：快速跳过前 {jump_pages} 页...")
-                for _ in range(jump_pages):
-                    if not self.is_running: return False
-                    for _ in range(4):
-                        self.hw_press("right", delay=0.06)
-                        time.sleep(0.1)
-                    time.sleep(0.15) # 给一点点动画缓冲时间
+
             pos_target = None
             found_car = False
-            current_page = jump_pages # 记录当前所在的真实页码
-            
-            # 最大翻页次数扣除已经跳过的页数
-            for _ in range(85 - jump_pages):
+            current_page = 0
+
+            # 항상 첫 페이지부터 순서대로 탐색
+            for _ in range(85):
                 if not self.is_running:
                     return False
                 pos_target = self.wait_for_image_with_element_multi(
@@ -5138,9 +5161,7 @@ class FH_UltimateBot(ctk.CTk):
                 if pos_target:
                     self.game_click(pos_target)
                     found_car = True
-                    # 记住这次找到车是在哪一页
-                    self.memory_car_page = current_page 
-                    self.log(f"锁定目标车辆！已记录当前页码: {current_page}")
+                    self.log(f"대상 차량을 고정했습니다. 현재 페이지: {current_page}")
                     break
                     
                 # 翻下一页
@@ -5150,28 +5171,58 @@ class FH_UltimateBot(ctk.CTk):
                 time.sleep(0.4)
                 current_page += 1
             if not found_car:
-                self.log("列表中未找到目标车辆，重置记忆页码。")
-                self.memory_car_page = 0 # 没找到说明车刷完了，清零记忆
+                self.log("목록에서 신규 차량을 찾지 못했습니다. 작업을 중단합니다.")
                 return False
             time.sleep(1.2)
-            self.log("尝试寻找'上车'按钮...")
 
-            pos_rc = None
-            pos_rc = self.wait_for_image_gray("rc.png", region=self.regions["全界面"], threshold=0.70, timeout=0.5, interval=0.1, fast_mode=True)
-            
+            self.log("'차량 탑승' 버튼을 확인합니다.")
+
+            pos_rc = self.wait_for_any_image_gray(
+                ["rc.png", "rc-b.png"],
+                region=self.regions["全界面"],
+                threshold=0.70,
+                timeout=0.5,
+                interval=0.1,
+                fast_mode=True
+            )
+
+            # 첫 번째 차량처럼 이미 선택된 상태라면 rc.png가 바로 보일 수 있음
+            # 그 외 차량은 Enter를 한 번 눌러야 차량 선택 메뉴가 열림
+            if not pos_rc:
+                self.log("탑승 버튼이 아직 없어 Enter로 차량 선택 메뉴를 엽니다.")
+                self.hw_press("enter")
+                time.sleep(1.2)
+
+                pos_rc = self.wait_for_any_image_gray(
+                    ["rc.png", "rc-b.png"],
+                    region=self.regions["全界面"],
+                    threshold=0.70,
+                    timeout=2.0,
+                    interval=0.1,
+                    fast_mode=True
+                )
+
             if pos_rc:
-                self.log("点击上车")
+                self.log("탑승 버튼을 찾았습니다. 자동차 보기 방지를 위해 선택 위치를 보정합니다.")
+                time.sleep(0.3)
+
+                self.hw_press("up", delay=0.08)
+                time.sleep(0.1)
+                self.hw_press("up", delay=0.08)
+                time.sleep(0.1)
+
+                self.log("차량 탑승 버튼을 클릭합니다.")
                 self.game_click(pos_rc)
-                time.sleep(2.0)  # 차량 탑승 로딩 대기 증가
+                time.sleep(6.0)
+
             else:
-                self.log("回车上车")
-                self.hw_press("enter")
-                time.sleep(2.0)
-                self.hw_press("enter")
-                time.sleep(2.5)
+                self.log("Enter 후에도 탑승 버튼을 찾지 못했습니다. 선택 실패로 보고 다시 신규 차량을 탐색합니다.")
+                self.hw_press("esc")
+                time.sleep(1.0)
+                continue
             
             # 차량 탑승 컷씬/로딩 대기
-            time.sleep(8.0)
+            time.sleep(6.0)
             
             pos_sjy = None
             self.log("차량 탑승 후 메뉴 진입을 시도합니다.")
@@ -5326,7 +5377,7 @@ class FH_UltimateBot(ctk.CTk):
         self.move_to_game_coord(5, 5)
         time.sleep(0.2)
 
-        pos = self.wait_for_image("rc.png", region=self.regions["全界面"], threshold=0.65, timeout=5, interval=0.2, fast_mode=True)
+        pos = self.wait_for_any_image(["rc.png", "rc-b.png"], region=self.regions["全界面"], threshold=0.65, timeout=5, interval=0.2, fast_mode=True)
         if pos:
             self.log("找到上车，执行点击")
             self.game_click(pos) # 【重要修复】：之前写的是 self.safe_click 导致直接报错崩溃，现已修正
@@ -5467,7 +5518,7 @@ class FH_UltimateBot(ctk.CTk):
         self.move_to_game_coord(5, 5)
         time.sleep(0.2)
 
-        pos = self.wait_for_image("rc.png", region=self.regions["全界面"], threshold=0.65, timeout=5, interval=0.2, fast_mode=True)
+        pos = self.wait_for_any_image(["rc.png", "rc-b.png"], region=self.regions["全界面"], threshold=0.65, timeout=5, interval=0.2, fast_mode=True)
         if pos:
             self.log("找到上车，执行点击")
             self.game_click(pos) # 【重要修复】：之前写的是 self.safe_click 导致直接报错崩溃，现已修正
