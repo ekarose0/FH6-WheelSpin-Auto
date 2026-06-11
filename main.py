@@ -87,11 +87,12 @@ INTERNAL_DIR = get_internal_dir()
 CONFIG_DIR = os.path.join(APP_DIR, "config")
 USER_CONFIG_FILE = os.path.join(APP_DIR, "config.json")      # <--- 全面替换为 config.json
 LOG_FILE = os.path.join(APP_DIR, "bot_log.txt")
+USER_IMAGE_CONFIG_FILE = os.path.join(APP_DIR, "userconfig.json")
 CACHE_DIR = os.path.join(APP_DIR, "cache")
 TEMPLATE_CACHE_FILE = os.path.join(CACHE_DIR, "template_cache.pkl")
 TEMPLATE_META_FILE = os.path.join(CACHE_DIR, "template_meta.json")
 CURRENT_VERSION = "1.1.6.2"
-CURRENT_VERSION_KR = "4.1"
+CURRENT_VERSION_KR = "4.2"
 def auto_extract_configs():
     os.makedirs(CONFIG_DIR, exist_ok=True)
     
@@ -760,6 +761,8 @@ class FH_UltimateBot(ctk.CTk):
         #加载配置文件
         auto_extract_configs()  
         self.load_config()
+        self.load_config()
+        self.user_image_config = self.load_user_image_config()
         self.ui_language = self.normalize_language(self.config.get("ui_language", DEFAULT_UI_LANGUAGE))
         self.config["ui_language"] = self.ui_language
 
@@ -891,7 +894,39 @@ class FH_UltimateBot(ctk.CTk):
         except Exception:
             pass
     
+    def load_user_image_config(self):
+        default_config = {
+            "_comment_1": "레이스 차량 탐색 범위 (기본값 80, 값이 클수록 liketag.png로부터 skillcar.png까지의 간격을 더 넓게 탐색합니다)",
+            "race_car_search_range": 80,
 
+            "_comment_2": "신규 차량 탐색 범위 (기본값 5, 값이 클수록 newcartag.png로부터 newCC.png까지의 간격을 더 넓게 탐색합니다)",
+            "new_car_search_range": 5
+        }
+
+        try:
+            if not os.path.exists(USER_IMAGE_CONFIG_FILE):
+                with open(USER_IMAGE_CONFIG_FILE, "w", encoding="utf-8") as f:
+                    json.dump(default_config, f, indent=4, ensure_ascii=False)
+                return default_config
+
+            with open(USER_IMAGE_CONFIG_FILE, "r", encoding="utf-8") as f:
+                user_config = json.load(f)
+
+            changed = False
+            for key, value in default_config.items():
+                if key not in user_config:
+                    user_config[key] = value
+                    changed = True
+
+            if changed:
+                with open(USER_IMAGE_CONFIG_FILE, "w", encoding="utf-8") as f:
+                    json.dump(user_config, f, indent=4, ensure_ascii=False)
+
+            return user_config
+
+        except Exception:
+            return default_config
+        
     def save_config(self):
         try:
             self.config["race_count"] = int(self.entry_race.get())
@@ -3604,6 +3639,19 @@ class FH_UltimateBot(ctk.CTk):
 
                     # 标签匹配 (NEW 标签或作者点赞标签)
                     pad = 80
+
+                    try:
+                        user_image_config = getattr(self, "user_image_config", {}) or {}
+
+                        if main_path == "skillcar.png" and sub_path == "liketag.png":
+                            pad = int(user_image_config.get("race_car_search_range", 80))
+                        
+                        elif main_path == "newCC.png" and sub_path == "newcartag.png":
+                            pad = int(user_image_config.get("new_car_search_range", 5))
+                        
+                    except Exception:
+                        pad = 80
+
                     sub_roi = screen_bgr[
                         max(0, y - pad):min(screen_bgr.shape[0], y + h_m + pad),
                         max(0, x - pad):min(screen_bgr.shape[1], x + w_m + pad),
@@ -3631,6 +3679,8 @@ class FH_UltimateBot(ctk.CTk):
                     if final_score >= final_threshold:
                         self.log(
                             f"[MultiMatch] 锁定目标: {main_path}+{sub_path} | "
+                            f"Pos: ({curr_pos[0]},{curr_pos[1]}) | "
+                            f"Range: {pad} | "
                             f"综合: {final_score:.3f} | 彩色: {color_score:.3f} | "
                             f"灰度: {gray_score:.3f} | 边缘: {edge_score:.3f} | "
                             f"中心: {center_score:.3f} | 标签: {like_score:.3f}"
