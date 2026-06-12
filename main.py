@@ -92,7 +92,7 @@ CACHE_DIR = os.path.join(APP_DIR, "cache")
 TEMPLATE_CACHE_FILE = os.path.join(CACHE_DIR, "template_cache.pkl")
 TEMPLATE_META_FILE = os.path.join(CACHE_DIR, "template_meta.json")
 CURRENT_VERSION = "1.1.6.2"
-CURRENT_VERSION_KR = "4.3.1"
+CURRENT_VERSION_KR = "4.4"
 def auto_extract_configs():
     os.makedirs(CONFIG_DIR, exist_ok=True)
     
@@ -747,6 +747,17 @@ class FH_UltimateBot(ctk.CTk):
 
         self.init_regions()
         
+        #加载配置文件
+        auto_extract_configs()
+        self.load_config()
+
+        # 고해상도/4K 이미지 보정 설정 변경 감지용
+        self._last_high_res_fix = self.config.get("high_res_image_fix", False)
+
+        self.user_image_config = self.load_user_image_config()
+        self.ui_language = self.normalize_language(self.config.get("ui_language", DEFAULT_UI_LANGUAGE))
+        self.config["ui_language"] = self.ui_language
+
         # 【优化加载速度】：将IO提取与图像缓存的加载/生成放到后台线程，避免阻塞主界面启动
         # 增加模型释放步骤
         def background_init():
@@ -757,14 +768,6 @@ class FH_UltimateBot(ctk.CTk):
             #if self.use_ocr:
             #    self.init_ocr_engine()
         threading.Thread(target=background_init, daemon=True).start()
-        
-        #加载配置文件
-        auto_extract_configs()  
-        self.load_config()
-        self.load_config()
-        self.user_image_config = self.load_user_image_config()
-        self.ui_language = self.normalize_language(self.config.get("ui_language", DEFAULT_UI_LANGUAGE))
-        self.config["ui_language"] = self.ui_language
 
         self.setup_ui()
         self.start_hotkey_listener()
@@ -876,6 +879,8 @@ class FH_UltimateBot(ctk.CTk):
             "telegram_on_step": True,
             "telegram_on_loop": True,
             "telegram_on_finish": True,
+            "high_res_image_fix": False,
+            "image_debug_log": False,
         }
         ext_path = USER_CONFIG_FILE
         # 2. 读取用户的 config.json，并与底本合并（自动补全缺失项）
@@ -1039,6 +1044,15 @@ class FH_UltimateBot(ctk.CTk):
         self.config["chk_3"] = self.var_chk3.get()
         self.config["chk_4"] = self.var_chk4.get()
         self.config["auto_restart"] = self.var_auto_restart.get()
+        new_high_res_fix = self.var_high_res_image_fix.get()
+        
+        if new_high_res_fix != self._last_high_res_fix:
+            self.clear_template_cache()
+        
+        self.config["high_res_image_fix"] = new_high_res_fix
+        self.config["image_debug_log"] = self.var_image_debug_log.get()
+
+        self._last_high_res_fix = new_high_res_fix
         self.config["restart_cmd"] = self.le_restart_cmd.get().strip()
         try:
             if hasattr(self, "entry_calc_a"):
@@ -1219,6 +1233,15 @@ class FH_UltimateBot(ctk.CTk):
         self.var_chk2 = ctk.BooleanVar(value=self.config["chk_2"])
         self.var_chk3 = ctk.BooleanVar(value=self.config["chk_3"])
         self.var_chk4 = ctk.BooleanVar(value=self.config.get("chk_4", True))
+
+        # 고해상도/4K 이미지 인식 보정 옵션
+        self.var_high_res_image_fix = ctk.BooleanVar(
+            value=self.config.get("high_res_image_fix", False)
+        )
+        # 이미지 실패 로그 옵션
+        self.var_image_debug_log = ctk.BooleanVar(
+            value=self.config.get("image_debug_log", False)
+        )
 
         box_race, self.btn_race, self.entry_race, self.lbl_race = create_box(
             self.config_frame,
@@ -1452,6 +1475,20 @@ class FH_UltimateBot(ctk.CTk):
         self.entry_global_loop.insert(0, str(self.config.get("global_loops", 10)))
         self.entry_global_loop.pack(side="left", padx=(0, 20))
         self.var_auto_restart = ctk.BooleanVar(value=self.config.get("auto_restart", True))
+        self.cb_high_res_image_fix = ctk.CTkCheckBox(
+            self.global_settings_frame,
+            text="4K 이미지 보정(실험적)",
+            variable=self.var_high_res_image_fix,
+            command=self.save_config
+        )
+        self.cb_image_debug_log = ctk.CTkCheckBox(
+            self.global_settings_frame,
+            text="이미지 인식 실패 디버그 로그",
+            variable=self.var_image_debug_log,
+            command=self.save_config
+        )
+        self.cb_image_debug_log.pack(side="left", padx=(0, 20))
+        self.cb_high_res_image_fix.pack(side="left", padx=(0, 20))
         self.cb_auto_restart = ctk.CTkCheckBox(self.global_settings_frame, text=self.t("auto_restart"), variable=self.var_auto_restart)
         self.cb_auto_restart.pack(side="left", padx=(10, 20))
         ctk.CTkLabel(self.global_settings_frame, text=self.t("restart_cmd")).pack(side="left", padx=(10, 5))
@@ -3258,6 +3295,28 @@ class FH_UltimateBot(ctk.CTk):
             self.scaled_template_cache.clear()
             self.load_template_file_cache()
 
+    def clear_template_cache(self):
+        try:
+            if os.path.exists(CACHE_DIR):
+                shutil.rmtree(CACHE_DIR)
+    
+            self.template_cache.clear()
+            self.scaled_template_cache.clear()
+            self.file_template_cache.clear()
+            self.edge_template_cache.clear()
+            self.scaled_edge_template_cache.clear()
+    
+            if hasattr(self, "template_gray_cache"):
+                self.template_gray_cache.clear()
+    
+            if hasattr(self, "template_transparent_cache"):
+                self.template_transparent_cache.clear()
+    
+            self.log("고해상도/4K 이미지 보정 설정 변경: 템플릿 캐시를 초기화했습니다.")
+    
+        except Exception as e:
+            self.log(f"템플릿 캐시 초기화 실패: {e}")
+
     def capture_forza_window_printwindow(self):
         try:
             import win32ui
@@ -3382,33 +3441,58 @@ class FH_UltimateBot(ctk.CTk):
     def get_scales_to_try(self, fast_mode=True):
         full_region = self.regions.get("全界面")
         curr_w = full_region[2] if full_region else pyautogui.size()[0]
-        # 你的图主要是按 2560 截的，就优先围绕 2560 计算
+    
+        # 고해상도/4K 보정 옵션
+        high_res_fix = bool(self.config.get("high_res_image_fix", False))
+    
+        # 대부분의 템플릿은 QHD 2560 기준으로 제작됨
         primary_base = 2560
         primary_scale = curr_w / primary_base
+    
         scales = []
+    
         def add_scale(s):
             s = round(float(s), 3)
-            if 0.45 <= s <= 1.8 and s not in scales:
+            if 0.40 <= s <= 2.20 and s not in scales:
                 scales.append(s)
-        # 先加“最可能正确”的比例及其微调
-        add_scale(primary_scale)
-        add_scale(primary_scale * 0.98)
-        add_scale(primary_scale * 1.02)
-        add_scale(primary_scale * 0.95)
-        add_scale(primary_scale * 1.05)
-        add_scale(primary_scale * 0.92)
-        add_scale(primary_scale * 1.08)
-        # 再兼容其它来源
-        for bw in [1920, 1600]:
+    
+        # 현재 해상도 기준 예상 배율
+        for mul in [1.0, 0.98, 1.02, 0.95, 1.05, 0.92, 1.08]:
+            add_scale(primary_scale * mul)
+    
+        # 4K 보정 ON일 때: 1.5배 주변을 더 촘촘히 탐색
+        if high_res_fix:
+            for s in [
+                1.50, 1.48, 1.52,
+                1.45, 1.55,
+                1.42, 1.58,
+                1.40, 1.60,
+                1.35, 1.65,
+            ]:
+                add_scale(s)
+    
+        # 다른 기준 해상도 호환
+        for bw in [3840, 3440, 3200, 2560, 1920, 1600]:
             s = curr_w / bw
+            for mul in [1.0, 0.98, 1.02]:
+                add_scale(s * mul)
+    
+        # 일반 fallback
+        for s in [
+            1.75, 1.70, 1.65, 1.60, 1.55,
+            1.50, 1.45, 1.40, 1.35, 1.30,
+            1.25, 1.20, 1.15, 1.10, 1.05,
+            1.00, 0.95, 0.90, 0.85, 0.80,
+            0.75, 0.70,
+        ]:
             add_scale(s)
-            add_scale(s * 0.98)
-            add_scale(s * 1.02)
-        # 最后兜底常用比例
-        for s in [1.0, 0.95, 1.05, 0.9, 1.1, 0.85, 1.15, 0.8, 0.75, 0.7]:
-            add_scale(s)
+    
+        # 기존 빠른 탐색은 너무 빨리 잘라서 4K에서 실패 가능성이 있음
         if fast_mode:
+            if high_res_fix:
+                return scales[:18]
             return scales[:8]
+    
         return scales
 
     def get_scaled_template(self, template_path, scale):
@@ -3453,6 +3537,9 @@ class FH_UltimateBot(ctk.CTk):
         try:
             scales_to_try = self.get_scales_to_try(fast_mode=fast_mode)
 
+            best_val = -1.0
+            best_scale = None
+
             for scale in scales_to_try:
                 tpl_c, actual_path = self.get_scaled_template(template_path, scale)
                 if tpl_c is None:
@@ -3467,16 +3554,27 @@ class FH_UltimateBot(ctk.CTk):
                 res = cv2.matchTemplate(screen_bgr, tpl_c, cv2.TM_CCOEFF_NORMED)
                 _, max_val, _, max_loc = cv2.minMaxLoc(res)
 
+                if max_val > best_val:
+                    best_val = max_val
+                    best_scale = scale
+
                 if max_val >= threshold:
                     pos = (
                         max_loc[0] + w // 2 + (region[0] if region else 0),
                         max_loc[1] + h // 2 + (region[1] if region else 0),
                     )
                     self.last_positions[template_path] = pos
-                    # 【新增】：在基础图像查找中增加详细日志返回
                     self.log(f"[ImageMatch] 命中: {template_path} | 得分: {max_val:.3f} (阈值 {threshold}) | 缩放比: {scale:.3f}")
                     return pos
 
+            if self.config.get("image_debug_log", False):
+                self.log(
+                    f"[ImageFail] {template_path} | "
+                    f"최고점수: {best_val:.3f} | "
+                    f"최고스케일: {best_scale} | "
+                    f"임계값: {threshold} | "
+                    f"fast_mode: {fast_mode}"
+                )
             return None
 
         except Exception as e:
@@ -4133,6 +4231,10 @@ class FH_UltimateBot(ctk.CTk):
             screen_gray = cv2.cvtColor(screen_bgr, cv2.COLOR_BGR2GRAY)
             scales_to_try = self.get_scales_to_try(fast_mode=fast_mode)
 
+            best_val = -1.0
+            best_scale = None
+            best_mode = "원본"
+
             tpl_gray_raw = self.load_template_gray(template_path)
             if tpl_gray_raw is None:
                 return None
@@ -4149,6 +4251,11 @@ class FH_UltimateBot(ctk.CTk):
                 res = cv2.matchTemplate(screen_gray, tpl_gray, cv2.TM_CCOEFF_NORMED)
                 _, max_val, _, max_loc = cv2.minMaxLoc(res)
 
+                if max_val > best_val:
+                    best_val = max_val
+                    best_scale = scale
+                    best_mode = "원본"
+
                 if max_val >= threshold:
                     self.log(f"[GrayMatch] 命中: {template_path} | 模式: 原图 | 灰度得分: {max_val:.3f} (阈值 {threshold}) | 缩放比: {scale:.3f}")
                     return (
@@ -4161,6 +4268,11 @@ class FH_UltimateBot(ctk.CTk):
                     res_inv = cv2.matchTemplate(screen_gray, tpl_inv, cv2.TM_CCOEFF_NORMED)
                     _, max_val_inv, _, max_loc_inv = cv2.minMaxLoc(res_inv)
 
+                    if max_val_inv > best_val:
+                        best_val = max_val_inv
+                        best_scale = scale
+                        best_mode = "반전"
+
                     if max_val_inv >= threshold:
                         self.log(f"[GrayMatch] 命中: {template_path} | 模式: 反相 | 灰度得分: {max_val_inv:.3f} (阈值 {threshold}) | 缩放比: {scale:.3f}")
                         return (
@@ -4168,6 +4280,16 @@ class FH_UltimateBot(ctk.CTk):
                             max_loc_inv[1] + h // 2 + (region[1] if region else 0),
                         )
 
+            if self.config.get("image_debug_log", False):
+                self.log(
+                    f"[GrayFail] {template_path} | "
+                    f"최고점수: {best_val:.3f} | "
+                    f"최고스케일: {best_scale} | "
+                    f"모드: {best_mode} | "
+                    f"임계값: {threshold} | "
+                    f"fast_mode: {fast_mode}"
+                )
+            
             return None
 
         except Exception as e:
@@ -4182,6 +4304,11 @@ class FH_UltimateBot(ctk.CTk):
             screen_bgr = self.capture_region(region)
             screen_gray = cv2.cvtColor(screen_bgr, cv2.COLOR_BGR2GRAY)
             scales_to_try = self.get_scales_to_try(fast_mode=fast_mode)
+
+            best_val = -1.0
+            best_scale = None
+            best_img = None
+            best_mode = "원본"
 
             for img_path in image_list:
                 tpl_gray_raw = self.load_template_gray(img_path)
@@ -4200,6 +4327,12 @@ class FH_UltimateBot(ctk.CTk):
                     res = cv2.matchTemplate(screen_gray, tpl_gray, cv2.TM_CCOEFF_NORMED)
                     _, max_val, _, max_loc = cv2.minMaxLoc(res)
 
+                    if max_val > best_val:
+                        best_val = max_val
+                        best_scale = scale
+                        best_img = img_path
+                        best_mode = "원본"
+
                     if max_val >= threshold:
                         self.log(f"[GrayMatchAny] 命中: {img_path} | 模式: 原图 | 灰度得分: {max_val:.3f} (阈值 {threshold}) | 缩放比: {scale:.3f}")
                         return (
@@ -4212,6 +4345,12 @@ class FH_UltimateBot(ctk.CTk):
                         res_inv = cv2.matchTemplate(screen_gray, tpl_inv, cv2.TM_CCOEFF_NORMED)
                         _, max_val_inv, _, max_loc_inv = cv2.minMaxLoc(res_inv)
 
+                        if max_val_inv > best_val:
+                            best_val = max_val_inv
+                            best_scale = scale
+                            best_img = img_path
+                            best_mode = "반전"
+
                         if max_val_inv >= threshold:
                             self.log(f"[GrayMatchAny] 命中: {img_path} | 模式: 反相 | 灰度得分: {max_val_inv:.3f} (阈值 {threshold}) | 缩放比: {scale:.3f}")
                             return (
@@ -4219,6 +4358,16 @@ class FH_UltimateBot(ctk.CTk):
                                 max_loc_inv[1] + h // 2 + (region[1] if region else 0),
                             )
 
+            if self.config.get("image_debug_log", False):
+                self.log(
+                    f"[GrayFailAny] {image_list} | "
+                    f"최고이미지: {best_img} | "
+                    f"최고점수: {best_val:.3f} | "
+                    f"최고스케일: {best_scale} | "
+                    f"모드: {best_mode} | "
+                    f"임계값: {threshold} | "
+                    f"fast_mode: {fast_mode}"
+                )
             return None
 
         except Exception as e:
