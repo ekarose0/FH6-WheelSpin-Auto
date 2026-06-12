@@ -92,7 +92,7 @@ CACHE_DIR = os.path.join(APP_DIR, "cache")
 TEMPLATE_CACHE_FILE = os.path.join(CACHE_DIR, "template_cache.pkl")
 TEMPLATE_META_FILE = os.path.join(CACHE_DIR, "template_meta.json")
 CURRENT_VERSION = "1.1.6.2"
-CURRENT_VERSION_KR = "4.3"
+CURRENT_VERSION_KR = "4.3.1"
 def auto_extract_configs():
     os.makedirs(CONFIG_DIR, exist_ok=True)
     
@@ -5207,21 +5207,30 @@ class FH_UltimateBot(ctk.CTk):
 
             start_right_count = max(0, min(start_right_count, 80))
 
-            if start_right_count > 0:
+            # 현재 휠스핀 진행 수 기준 자동 보정
+            # 12대마다 한 화면이 소비되었다고 보되,
+            # 이미지 오탐/실패 여유를 위해 +3대 이후부터 다음 페이지 보정을 적용합니다.
+            auto_right_count = max(0, ((self.cj_counter - 3) // 12) * 4)
+            
+            total_right_count = start_right_count + auto_right_count
+            
+            if total_right_count > 0:
                 self.log(
-                    f"userconfig 설정에 따라 신규 차량 탐색 전 오른쪽으로 "
-                    f"{start_right_count}회 이동합니다."
+                    f"신규 차량 탐색 시작 위치 보정: "
+                    f"userconfig {start_right_count}회 + "
+                    f"진행도 보정 {auto_right_count}회 = "
+                    f"총 오른쪽 {total_right_count}회 이동"
                 )
-
-                for _ in range(start_right_count):
+            
+                for _ in range(total_right_count):
                     if not self.is_running:
                         return False
-
+            
                     self.hw_press("right", delay=0.08)
                     time.sleep(0.12)
-
+            
                 time.sleep(0.5)
-
+            
             pos_target = None
             found_car = False
 
