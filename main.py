@@ -908,6 +908,11 @@ class FH_UltimateBot(ctk.CTk):
                 "신규 차량 탐색 시작 전 오른쪽 방향키를 몇 번 누를지 설정합니다. 0이면 처음부터 탐색합니다. 예: 3 = 오른쪽 3번 누른뒤 화면 탐색(기본값 0)",
             "new_car_start_right_count": 0,
 
+            "_comment_new_car_page_buffer":
+                "신규 차량 자동 페이지 보정 여유값입니다. 차량 12대마다 다음 페이지로 이동한 것으로 판단하며, 값이 클수록 다음 페이지로 넘어가는 시점이 늦어집니다. (기본값 3)",
+
+            "new_car_page_buffer": 3,
+
             "_comment_car_enter_wait":
                 "차량 탑승 후 ESC 메뉴 진입 전 대기시간(초) (기본값 6)",
             "car_enter_wait": 6,
@@ -5210,16 +5215,28 @@ class FH_UltimateBot(ctk.CTk):
             # 현재 휠스핀 진행 수 기준 자동 보정
             # 12대마다 한 화면이 소비되었다고 보되,
             # 이미지 오탐/실패 여유를 위해 +3대 이후부터 다음 페이지 보정을 적용합니다.
-            auto_right_count = max(0, ((self.cj_counter - 3) // 12) * 4)
+            page_buffer = int(
+                self.user_image_config.get(
+                    "new_car_page_buffer",
+                    3
+                )
+            )
+
+            auto_right_count = max(
+                0,
+                ((self.cj_counter - page_buffer) // 12) * 4
+            )
             
             total_right_count = start_right_count + auto_right_count
             
             if total_right_count > 0:
                 self.log(
-                    f"신규 차량 탐색 시작 위치 보정: "
-                    f"userconfig {start_right_count}회 + "
-                    f"진행도 보정 {auto_right_count}회 = "
-                    f"총 오른쪽 {total_right_count}회 이동"
+                    f"신규 차량 시작 위치 보정: "
+                    f"user {start_right_count}칸 + "
+                    f"진행도 {auto_right_count}칸 "
+                    f"(현재 차량 {self.cj_counter}대, "
+                    f"여유값 {page_buffer}) "
+                    f"= 총 {total_right_count}칸 이동"
                 )
             
                 for _ in range(total_right_count):
