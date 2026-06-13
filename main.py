@@ -703,6 +703,7 @@ class FH_UltimateBot(ctk.CTk):
         self.setup_ui()
         self.update_skill_grid()
         self.center_window()
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.log("语言已切换。")
 
     def __init__(self):
@@ -1972,6 +1973,20 @@ class FH_UltimateBot(ctk.CTk):
             
         #ocr加载 
     
+    def on_closing(self):
+        try:
+            self.save_config()
+        except Exception as e:
+            try:
+                self.log(f"종료 시 설정 저장 실패: {e}")
+            except Exception:
+                pass
+            
+        try:
+            self.destroy()
+        except Exception:
+            pass
+
     def open_support_window(self):
         if self.support_win is not None and self.support_win.winfo_exists():
             self.support_win.focus()
