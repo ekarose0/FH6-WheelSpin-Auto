@@ -881,6 +881,7 @@ class FH_UltimateBot(ctk.CTk):
             "telegram_on_finish": True,
             "high_res_image_fix": False,
             "image_debug_log": False,
+            "always_on_top": True,
             "race_sp_per_run": 10,
             "finish_detect_start_sec": 0,
             "finish_detect_max_sec": 120,
@@ -958,6 +959,13 @@ class FH_UltimateBot(ctk.CTk):
                 "threshold": 0.75,
                 "fast_mode": True,
                 "up_wait": 0.25
+            },
+
+            "_comment_upgrade_search_settings": "업그레이드 및 튜닝 메뉴(UandT) 탐색 설정입니다. threshold=낮출수록 인식이 쉬워지지만 오인식 가능성이 증가합니다. fast_mode=false는 느리지만 더 넓게 탐색합니다. (기본값: 0.70 / True)",
+
+            "upgrade_search_settings": {
+                "threshold": 0.70,
+                "fast_mode": True
             }
         }
 
@@ -1036,6 +1044,27 @@ class FH_UltimateBot(ctk.CTk):
 
         return main_threshold, like_threshold, final_threshold, fast_mode
 
+    def get_upgrade_search_settings(self):
+        cfg = self.user_image_config.get("upgrade_search_settings", {})
+
+        try:
+            threshold = float(cfg.get("threshold", 0.70))
+        except Exception:
+            threshold = 0.70
+
+        try:
+            fast_mode = cfg.get("fast_mode", True)
+            if isinstance(fast_mode, str):
+                fast_mode = fast_mode.strip().lower() == "true"
+            else:
+                fast_mode = bool(fast_mode)
+        except Exception:
+            fast_mode = True
+
+        threshold = max(0.40, min(threshold, 0.90))
+
+        return threshold, fast_mode
+
     def get_brand_search_settings(self):
         brand_cfg = self.user_image_config.get("brand_search_settings", {})
     
@@ -1098,6 +1127,8 @@ class FH_UltimateBot(ctk.CTk):
         
         self.config["high_res_image_fix"] = new_high_res_fix
         self.config["image_debug_log"] = self.var_image_debug_log.get()
+        if hasattr(self, "var_always_on_top"):
+            self.config["always_on_top"] = self.var_always_on_top.get()
 
         self._last_high_res_fix = new_high_res_fix
         self.config["restart_cmd"] = self.le_restart_cmd.get().strip()
@@ -1362,6 +1393,10 @@ class FH_UltimateBot(ctk.CTk):
         # 이미지 실패 로그 옵션
         self.var_image_debug_log = ctk.BooleanVar(
             value=self.config.get("image_debug_log", False)
+        )
+
+        self.var_always_on_top = ctk.BooleanVar(
+            value=self.config.get("always_on_top", True)
         )
 
         box_race, self.btn_race, self.entry_race, self.lbl_race = create_box(
@@ -1858,6 +1893,19 @@ class FH_UltimateBot(ctk.CTk):
         )
         self.btn_pause_hint.pack()
 
+        self.btn_topmost = ctk.CTkButton(
+            self.hotkey_button_frame,
+            text="📌 항상 위 OFF",
+            fg_color="#3A3A3A",
+            hover_color="#4A4A4A",
+            width=180,
+            height=45,
+            corner_radius=12,
+            font=ctk.CTkFont(size=14, weight="bold"),
+            command=self.toggle_always_on_top
+        )
+        self.btn_topmost.pack(pady=(6, 0))
+
         self.log_box = ctk.CTkTextbox(
             self.bottom_frame,
             state="disabled",
@@ -1881,6 +1929,47 @@ class FH_UltimateBot(ctk.CTk):
         self.btn_support.pack(fill="x", padx=18, pady=(6, 12))
         self.sync_buy_to_sell()
 
+        self.apply_always_on_top_state(log_message=True)
+
+    def apply_always_on_top_state(self, log_message=True):
+        enabled = bool(self.config.get("always_on_top", False))
+
+        self.attributes("-topmost", enabled)
+
+        if hasattr(self, "var_always_on_top"):
+            self.var_always_on_top.set(enabled)
+
+        if hasattr(self, "btn_topmost"):
+            if enabled:
+                self.btn_topmost.configure(
+                    text="📌 항상 위 ON",
+                    fg_color="#2563EB",
+                    hover_color="#1D4ED8"
+                )
+            else:
+                self.btn_topmost.configure(
+                    text="📌 항상 위 OFF",
+                    fg_color="#3A3A3A",
+                    hover_color="#4A4A4A"
+                )
+
+        if log_message:
+            self.log("매크로 창 항상 위에 표시: ON" if enabled else "매크로 창 항상 위에 표시: OFF")
+
+
+    def toggle_always_on_top(self):
+        current = bool(self.config.get("always_on_top", True))
+        new_value = not current
+    
+        self.config["always_on_top"] = new_value
+    
+        if hasattr(self, "var_always_on_top"):
+            self.var_always_on_top.set(new_value)
+    
+        self.apply_always_on_top_state(log_message=True)
+        self.save_config()
+
+            
         #ocr加载 
     
     def open_support_window(self):
@@ -2581,7 +2670,7 @@ class FH_UltimateBot(ctk.CTk):
         pos_x = last_x + last_w - calc_w - 20
         pos_y = last_y + 20
 
-        self.attributes("-topmost", True)
+        self.attributes("-topmost", self.config.get("always_on_top", False))
         self.geometry(f"{calc_w}x{calc_h}+{pos_x}+{pos_y}")
         
         # 启动计时器
@@ -2780,7 +2869,8 @@ class FH_UltimateBot(ctk.CTk):
             
             # 恢复窗口原本的状态
             self.btn_stop.configure(text=self.t("waiting_command_plain"), fg_color="#3A3A3A", hover_color="#4A4A4A")
-            self.attributes("-topmost", False)
+            self.attributes("-topmost", self.config.get("always_on_top", False))
+            self.apply_always_on_top_state(log_message=False)
             self.geometry("1800x880")
             self.center_window()
 
@@ -5736,13 +5826,15 @@ class FH_UltimateBot(ctk.CTk):
                 self.hw_press("esc", delay=0.2)
                 time.sleep(2.0)
             
+                upgrade_threshold, upgrade_fast_mode = self.get_upgrade_search_settings()
+
                 pos_sjy = self.wait_for_any_image_gray(
                     ["UandT-w.png", "UandT-b.png"],
                     region=self.regions["左下"],
-                    threshold=0.70,
+                    threshold=upgrade_threshold,
                     timeout=6,
                     interval=0.5,
-                    fast_mode=True
+                    fast_mode=upgrade_fast_mode
                 )
             
                 if pos_sjy:
@@ -6208,5 +6300,6 @@ class FH_UltimateBot(ctk.CTk):
     #---自动超级抽奖-----
     #===============================
 if __name__ == "__main__":
+
     app = FH_UltimateBot()
     app.mainloop()
