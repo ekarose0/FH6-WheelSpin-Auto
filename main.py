@@ -92,7 +92,7 @@ CACHE_DIR = os.path.join(APP_DIR, "cache")
 TEMPLATE_CACHE_FILE = os.path.join(CACHE_DIR, "template_cache.pkl")
 TEMPLATE_META_FILE = os.path.join(CACHE_DIR, "template_meta.json")
 CURRENT_VERSION = "1.1.6.2"
-CURRENT_VERSION_KR = "4.5"
+CURRENT_VERSION_KR = "4.5.1"
 def auto_extract_configs():
     os.makedirs(CONFIG_DIR, exist_ok=True)
     
@@ -912,6 +912,20 @@ class FH_UltimateBot(ctk.CTk):
                 "레이스 차량 탐색 범위, 값이 클수록 liketag.png로부터 skillcar.png까지의 간격을 더 넓게 탐색합니다(기본값 80)",
             "race_car_search_range": 80,
 
+            "_comment_race_car_search_settings":
+                "레이스 차량(skillcar.png + liketag.png) 탐색 설정입니다. "
+                "main_threshold=차량 이미지 후보 점수, like_threshold=liketag 점수, final_threshold=최종 판정 점수입니다. "
+                "threshold는 낮출수록 인식이 쉬워지지만 오인식 가능성이 증가합니다. "
+                "fast_mode=true는 빠른 탐색, false는 느리지만 더 넓게 탐색합니다. "
+                "(기본값: 0.75 / 0.70 / 0.70 / True)",
+
+            "race_car_search_settings": {
+                "main_threshold": 0.75,
+                "like_threshold": 0.70,
+                "final_threshold": 0.70,
+                "fast_mode": True
+            },
+
             "_comment_new_car_search_range": 
                 "신규 차량 탐색 범위, 값이 클수록 newcartag.png로부터 newCC.png까지의 간격을 더 넓게 탐색합니다(기본값 5)",
             "new_car_search_range": 5,
@@ -993,6 +1007,35 @@ class FH_UltimateBot(ctk.CTk):
 
         except Exception:
             return default_config
+    def get_race_car_search_settings(self):
+        car_cfg = self.user_image_config.get("race_car_search_settings", {})
+
+        try:
+            main_threshold = float(car_cfg.get("main_threshold", 0.75))
+        except Exception:
+            main_threshold = 0.75
+
+        try:
+            like_threshold = float(car_cfg.get("like_threshold", 0.70))
+        except Exception:
+            like_threshold = 0.70
+
+        try:
+            final_threshold = float(car_cfg.get("final_threshold", 0.70))
+        except Exception:
+            final_threshold = 0.70
+
+        try:
+            fast_mode = bool(car_cfg.get("fast_mode", True))
+        except Exception:
+            fast_mode = True
+
+        main_threshold = max(0.45, min(main_threshold, 0.90))
+        like_threshold = max(0.45, min(like_threshold, 0.90))
+        final_threshold = max(0.45, min(final_threshold, 0.90))
+
+        return main_threshold, like_threshold, final_threshold, fast_mode
+
     def get_brand_search_settings(self):
         brand_cfg = self.user_image_config.get("brand_search_settings", {})
     
@@ -1052,9 +1095,6 @@ class FH_UltimateBot(ctk.CTk):
         self.config["chk_4"] = self.var_chk4.get()
         self.config["auto_restart"] = self.var_auto_restart.get()
         new_high_res_fix = self.var_high_res_image_fix.get()
-        
-        if new_high_res_fix != self._last_high_res_fix:
-            self.clear_template_cache()
         
         self.config["high_res_image_fix"] = new_high_res_fix
         self.config["image_debug_log"] = self.var_image_debug_log.get()
@@ -3591,81 +3631,65 @@ class FH_UltimateBot(ctk.CTk):
 
     def get_scales_to_try(self, fast_mode=True):
         full_region = self.regions.get("全界面")
+        curr_w = full_region[2] if full_region else pyautogui.size()[0]
 
-        if full_region:
-            curr_w = full_region[2]
-            curr_h = full_region[3]
-        else:
-            curr_w, curr_h = pyautogui.size()
-
-        # 고해상도/4K 보정 옵션
         high_res_fix = bool(self.config.get("high_res_image_fix", False))
 
-        # 대부분의 템플릿은 WQHD 2560x1440 기준으로 제작됨
-        base_w = 2560
-        base_h = 1440
-
-        width_scale = curr_w / base_w
-        height_scale = curr_h / base_h
-
-        # UWQHD(3440x1440)는 폭 기준 1.34가 아니라 세로 기준 1.0이 맞는 경우가 많음
-        # 4K(3840x2160)는 폭/세로 모두 1.5라 그대로 1.5가 됨
-        primary_scale = min(width_scale, height_scale)
+        # 4.3.1 기본 방식 유지
+        primary_base = 2560
+        primary_scale = curr_w / primary_base
 
         scales = []
 
         def add_scale(s):
             s = round(float(s), 3)
-            if 0.40 <= s <= 2.20 and s not in scales:
+            if 0.45 <= s <= 1.80 and s not in scales:
                 scales.append(s)
-    
-        # 1순위: 실제 UI 크기에 가까운 세로/최소 기준 배율
-        for base_scale in [primary_scale, height_scale, width_scale]:
-            for mul in [1.0, 0.98, 1.02, 0.95, 1.05, 0.92, 1.08]:
-                add_scale(base_scale * mul)
-    
-        # 4K 보정 ON일 때: 1.5배 주변을 더 촘촘히 탐색
+
+        # 기본 QHD 기준 스케일
+        add_scale(primary_scale)
+        add_scale(primary_scale * 0.98)
+        add_scale(primary_scale * 1.02)
+        add_scale(primary_scale * 0.95)
+        add_scale(primary_scale * 1.05)
+        add_scale(primary_scale * 0.92)
+        add_scale(primary_scale * 1.08)
+
+        # 4.3.1 기존 호환 스케일
+        for bw in [1920, 1600]:
+            s = curr_w / bw
+            add_scale(s)
+            add_scale(s * 0.98)
+            add_scale(s * 1.02)
+
+        # 4.3.1 기존 fallback
+        for s in [1.0, 0.95, 1.05, 0.9, 1.1, 0.85, 1.15, 0.8, 0.75, 0.7]:
+            add_scale(s)
+
+        # 고해상도 보정 ON일 때만 추가
         if high_res_fix:
+            for bw in [3840, 3440, 3200, 2560]:
+                s = curr_w / bw
+                add_scale(s)
+                add_scale(s * 0.98)
+                add_scale(s * 1.02)
+                add_scale(s * 0.95)
+                add_scale(s * 1.05)
+
             for s in [
                 1.50, 1.48, 1.52,
                 1.45, 1.55,
-                1.42, 1.58,
                 1.40, 1.60,
                 1.35, 1.65,
+                1.30, 1.70,
             ]:
                 add_scale(s)
-    
-        # 다른 기준 해상도 호환
-        for bw, bh in [
-            (3840, 2160),
-            (3440, 1440),
-            (3200, 1800),
-            (2560, 1440),
-            (1920, 1080),
-            (1600, 900),
-        ]:
-            s_w = curr_w / bw
-            s_h = curr_h / bh
-            s = min(s_w, s_h)
-    
-            for mul in [1.0, 0.98, 1.02]:
-                add_scale(s * mul)
-    
-        # 일반 fallback
-        for s in [
-            1.75, 1.70, 1.65, 1.60, 1.55,
-            1.50, 1.45, 1.40, 1.35, 1.30,
-            1.25, 1.20, 1.15, 1.10, 1.05,
-            1.00, 0.98, 1.02, 0.95, 0.90,
-            0.85, 0.80, 0.75, 0.70,
-        ]:
-            add_scale(s)
-    
+
         if fast_mode:
             if high_res_fix:
                 return scales[:24]
-            return scales[:10]
-    
+            return scales[:8]
+
         return scales
 
     def get_scaled_template(self, template_path, scale):
@@ -5014,18 +5038,20 @@ class FH_UltimateBot(ctk.CTk):
             time.sleep(4.0)
         
         else:
+            race_car_main_threshold, race_car_like_threshold, race_car_final_threshold, race_car_fast_mode = self.get_race_car_search_settings()
+
             pos_target = self.wait_for_image_with_element_multi(
                 "skillcar.png",
                 "liketag.png",
                 region=self.regions["全界面"],
-                fast_mode=True,
-                main_threshold=0.75,
-                like_threshold=0.7,
-                final_threshold=0.7,
+                fast_mode=race_car_fast_mode,
+                main_threshold=race_car_main_threshold,
+                like_threshold=race_car_like_threshold,
+                final_threshold=race_car_final_threshold,
                 timeout=2,
                 interval=0.25
             )
-        
+
             if not pos_target:
                 self.log("목표 차량을 찾지 못했습니다. 즐겨찾기 차량 목록으로 진입 후 재탐색합니다.")
         
@@ -5036,31 +5062,34 @@ class FH_UltimateBot(ctk.CTk):
                 self.hw_press("esc")
                 time.sleep(1.0)
         
+                race_car_main_threshold, race_car_like_threshold, race_car_final_threshold, race_car_fast_mode = self.get_race_car_search_settings()
+
                 pos_target = self.wait_for_image_with_element_multi(
                     "skillcar.png",
                     "liketag.png",
                     region=self.regions["全界面"],
-                    fast_mode=True,
-                    main_threshold=0.75,
-                    like_threshold=0.7,
-                    final_threshold=0.7,
+                    fast_mode=race_car_fast_mode,
+                    main_threshold=race_car_main_threshold,
+                    like_threshold=race_car_like_threshold,
+                    final_threshold=race_car_final_threshold,
                     timeout=2,
                     interval=0.25
                 )
-        
                 if not pos_target:
                     self.log("즐겨찾기에서도 목표 차량을 찾지 못했습니다. 브랜드 목록으로 이동합니다.")
         
                     self.hw_press("backspace")
                     time.sleep(1.2)
         
+                    brand_threshold, brand_fast_mode, brand_up_wait = self.get_brand_search_settings()
+
                     brand_pos = self.wait_for_any_image_gray(
                         ["CCbrand.png", "CCbrand-b.png"],
                         region=self.regions["全界面"],
-                        threshold=0.75,
+                        threshold=brand_threshold,
                         timeout=3,
                         interval=0.25,
-                        fast_mode=True
+                        fast_mode=brand_fast_mode
                     )
         
                     if not brand_pos:
@@ -5070,14 +5099,16 @@ class FH_UltimateBot(ctk.CTk):
                     self.game_click(brand_pos)
                     time.sleep(1.0)
         
+                    race_car_main_threshold, race_car_like_threshold, race_car_final_threshold, race_car_fast_mode = self.get_race_car_search_settings()
+
                     pos_target = self.wait_for_image_with_element_multi(
                         "skillcar.png",
                         "liketag.png",
                         region=self.regions["全界面"],
-                        fast_mode=True,
-                        main_threshold=0.75,
-                        like_threshold=0.7,
-                        final_threshold=0.7,
+                        fast_mode=race_car_fast_mode,
+                        main_threshold=race_car_main_threshold,
+                        like_threshold=race_car_like_threshold,
+                        final_threshold=race_car_final_threshold,
                         timeout=2,
                         interval=0.25
                     )
@@ -5087,16 +5118,18 @@ class FH_UltimateBot(ctk.CTk):
                         if not self.is_running:
                             return False
         
+                        race_car_main_threshold, race_car_like_threshold, race_car_final_threshold, race_car_fast_mode = self.get_race_car_search_settings()
+
                         pos_target = self.wait_for_image_with_element_multi(
                             "skillcar.png",
                             "liketag.png",
                             region=self.regions["全界面"],
-                            main_threshold=0.75,
-                            like_threshold=0.7,
-                            final_threshold=0.7,
+                            fast_mode=race_car_fast_mode,
+                            main_threshold=race_car_main_threshold,
+                            like_threshold=race_car_like_threshold,
+                            final_threshold=race_car_final_threshold,
                             timeout=2,
-                            interval=0.25,
-                            fast_mode=True
+                            interval=0.25
                         )
         
                         if pos_target:
@@ -5214,12 +5247,7 @@ class FH_UltimateBot(ctk.CTk):
                 finish_detect_start_sec = 0
             
             try:
-                finish_detect_max_sec = int(
-                    self.config.get(
-                        "finish_detect_max_sec",
-                        self.config.get("race_timeout_sec", 120)
-                    )
-                )
+                finish_detect_max_sec = int(self.config.get("finish_detect_max_sec", 120))
             except Exception:
                 finish_detect_max_sec = 120
             
