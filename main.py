@@ -92,7 +92,7 @@ CACHE_DIR = os.path.join(APP_DIR, "cache")
 TEMPLATE_CACHE_FILE = os.path.join(CACHE_DIR, "template_cache.pkl")
 TEMPLATE_META_FILE = os.path.join(CACHE_DIR, "template_meta.json")
 CURRENT_VERSION = "1.1.6.2"
-CURRENT_VERSION_KR = "4.4"
+CURRENT_VERSION_KR = "4.5"
 def auto_extract_configs():
     os.makedirs(CONFIG_DIR, exist_ok=True)
     
@@ -709,7 +709,7 @@ class FH_UltimateBot(ctk.CTk):
         super().__init__()
         #窗口相关
         self.title(f"FH6Auto KR Edition v{CURRENT_VERSION_KR} / Original by YSTO v{CURRENT_VERSION}")
-        self.geometry("1800x800")
+        self.geometry("1800x880")
         #self.minsize(980, 560)
         self.attributes("-topmost", False)
         self.attributes("-alpha", 0.98)
@@ -881,6 +881,13 @@ class FH_UltimateBot(ctk.CTk):
             "telegram_on_finish": True,
             "high_res_image_fix": False,
             "image_debug_log": False,
+            "race_sp_per_run": 10,
+            "finish_detect_start_sec": 0,
+            "finish_detect_max_sec": 120,
+            "race_count_bonus": 1,
+            "loop_race_limit": 100,
+            "max_sp_per_loop": 990,
+            "loop_count_bonus": 0,
         }
         ext_path = USER_CONFIG_FILE
         # 2. 读取用户的 config.json，并与底本合并（自动补全缺失项）
@@ -1059,6 +1066,27 @@ class FH_UltimateBot(ctk.CTk):
                 self.config["calc_a"] = self.entry_calc_a.get().strip()
                 self.config["calc_b"] = self.entry_calc_b.get().strip()
                 self.config["calc_c"] = self.entry_calc_c.get().strip()
+            if hasattr(self, "entry_race_sp_per_run"):
+                val = self.entry_race_sp_per_run.get().strip()
+                self.config["race_sp_per_run"] = int(val) if val else 10
+
+                val = self.entry_finish_detect_start_sec.get().strip()
+                self.config["finish_detect_start_sec"] = int(val) if val else 0
+
+                val = self.entry_finish_detect_max_sec.get().strip()
+                self.config["finish_detect_max_sec"] = int(val) if val else 120
+
+                val = self.entry_race_count_bonus.get().strip()
+                self.config["race_count_bonus"] = int(val) if val else 1
+
+                val = self.entry_loop_race_limit.get().strip()
+                self.config["loop_race_limit"] = int(val) if val else 100
+
+                val = self.entry_max_sp_per_loop.get().strip()
+                self.config["max_sp_per_loop"] = int(val) if val else 990
+
+                val = self.entry_loop_count_bonus.get().strip()
+                self.config["loop_count_bonus"] = int(val) if val else 0
         except Exception:
             pass
         try:
@@ -1089,70 +1117,123 @@ class FH_UltimateBot(ctk.CTk):
         if not val_a:
             self.log("未输入CR，无需计算。")
             return
-            
+    
         try:
             target_cr = int(val_a)
+    
             val_b = self.entry_calc_b.get().strip()
             cost_per_car = int(val_b) if val_b else 81700
-            
+    
             val_c = self.entry_calc_c.get().strip()
             sp_per_car = int(val_c) if val_c else 30
+    
+            val_race_sp = self.entry_race_sp_per_run.get().strip()
+            race_sp_per_run = int(val_race_sp) if val_race_sp else 10
+    
+            val_race_bonus = self.entry_race_count_bonus.get().strip()
+            race_count_bonus = int(val_race_bonus) if val_race_bonus else 1
+    
+            val_loop_limit = self.entry_loop_race_limit.get().strip()
+            loop_race_limit = int(val_loop_limit) if val_loop_limit else 100
+            
+            val_max_sp = self.entry_max_sp_per_loop.get().strip()
+            max_sp_per_loop = int(val_max_sp) if val_max_sp else 990
+    
+            val_loop_bonus = self.entry_loop_count_bonus.get().strip()
+            loop_count_bonus = int(val_loop_bonus) if val_loop_bonus else 0
+    
         except Exception:
             self.log("输入格式有误，请确保只输入数字！")
             return
-
-        if cost_per_car <= 0 or sp_per_car <= 0:
+    
+        if cost_per_car <= 0 or sp_per_car <= 0 or race_sp_per_run <= 0 or loop_race_limit <= 0 or max_sp_per_loop <= 0:
             self.log("单车成本或技能点不能为 0！")
             return
+    
+        race_count_bonus = max(0, race_count_bonus)
+        loop_count_bonus = max(0, loop_count_bonus)
 
-        # 1. 基础转换（总车数 & 总跑图数）
+        # 루프당 최대 보유 SP 기준으로 1루프 레이스 상한 계산
+        max_races_by_sp = max_sp_per_loop // race_sp_per_run
+
+        if max_races_by_sp <= 0:
+            self.log("루프당 최대 SP가 1판 획득 SP보다 낮아 계산할 수 없습니다.")
+            return
+
+        # 기존 루프 기준 레이스와 SP 상한 중 더 작은 값을 실제 루프 상한으로 사용
+        effective_loop_limit = min(loop_race_limit, max_races_by_sp)
+    
+        # 1. 기본 변환
         total_cars = target_cr // cost_per_car
-        total_races = ((total_cars * sp_per_car) // 10) + 1
-
+        total_required_sp = total_cars * sp_per_car
+    
+        # 기존 계산 방식 유지:
+        # 기존: ((필요 SP) // 10) + 1
+        # 변경: ((필요 SP) // 1판 획득 SP) + 계산 여유 레이스
+        total_races = (total_required_sp // race_sp_per_run) + race_count_bonus
+    
         if total_races <= 0:
             self.log(f"目标金额不足(只够买{total_cars}辆车)，无法产生有效跑图！")
             return
-
-        # 2. 核心分配逻辑
-        if total_races <= 100:
+    
+        # 2. 대루프 분배
+        if total_races <= effective_loop_limit:
             final_loops = 1
             final_races_per_loop = total_races
         else:
             import math
-            loops = math.ceil(total_races / 100)
+    
+            loops = math.ceil(total_races / effective_loop_limit)
             avg_races = total_races // loops
-
-            if avg_races >= 70:
+    
+            if avg_races >= int(effective_loop_limit * 0.70):
                 final_loops = loops
                 final_races_per_loop = avg_races
             else:
-                final_races_per_loop = 100
-                final_loops = total_races // 100
+                final_races_per_loop = effective_loop_limit
+                final_loops = total_races // effective_loop_limit
+    
+        # 3. 루프 여유 보정
+        # 예: 계산 결과 99회 → 보정치 1이면 100회
+        final_races_per_loop += loop_count_bonus
 
-        # 3. 反推每一轮买车、抽奖、卖车的具体数量
-        cars_per_loop = (final_races_per_loop * 10) // sp_per_car
-
+        # 루프 여유 보정 후에도 최대 SP를 넘지 않도록 제한
+        if final_races_per_loop > max_races_by_sp:
+            final_races_per_loop = max_races_by_sp
+    
         if final_loops <= 0:
             self.log("计算后可用大循环次数为0。")
             return
-
-        # 4. 自动填写到界面
+    
+        # 4. 레이스당 획득 SP 기준으로 루프당 차량/스킬 작업 수 계산
+        cars_per_loop = (final_races_per_loop * race_sp_per_run) // sp_per_car
+    
+        if cars_per_loop <= 0:
+            self.log("计算后车辆数量为0。")
+            return
+    
+        # 5. 자동 입력
         self.entry_race.delete(0, "end")
         self.entry_race.insert(0, str(final_races_per_loop))
-        
+    
         self.entry_car.delete(0, "end")
         self.entry_car.insert(0, str(cars_per_loop))
-        
+    
         self.entry_cj.delete(0, "end")
         self.entry_cj.insert(0, str(cars_per_loop))
-        
+    
         self.entry_sc.delete(0, "end")
         self.entry_sc.insert(0, str(cars_per_loop))
-        
+    
         self.entry_global_loop.delete(0, "end")
         self.entry_global_loop.insert(0, str(final_loops))
-
-        self.log(f"✅计算完成: 总计需{total_cars}车, 共跑图{total_races}次。分配为: {final_loops} 个大循环, 每轮跑图 {final_races_per_loop} 次, 动作 {cars_per_loop} 辆。")
+    
+        self.log(
+            f"✅计算完成: 总计需{total_cars}车, 共跑图{total_races}次。"
+            f"分配为: {final_loops} 个大循环, 每轮跑图 {final_races_per_loop} 次, "
+            f"动作 {cars_per_loop} 辆。"
+        )
+    
         self.save_config()
 
     # ==========================================
@@ -1477,7 +1558,7 @@ class FH_UltimateBot(ctk.CTk):
         self.var_auto_restart = ctk.BooleanVar(value=self.config.get("auto_restart", True))
         self.cb_high_res_image_fix = ctk.CTkCheckBox(
             self.global_settings_frame,
-            text="4K 이미지 보정(실험적)",
+            text="고해상도 이미지 보정(UWQHD, 4K 등)",
             variable=self.var_high_res_image_fix,
             command=self.save_config
         )
@@ -1518,6 +1599,52 @@ class FH_UltimateBot(ctk.CTk):
         
         # =================================
 
+        # ====== 레이스 세부설정 ======
+        self.race_detail_frame = ctk.CTkFrame(self, fg_color="#2B2B2B", height=45, corner_radius=10)
+        self.race_detail_frame.pack(fill="x", padx=18, pady=(10, 0))
+        self.race_detail_frame.pack_propagate(False)
+
+        ctk.CTkLabel(
+            self.race_detail_frame,
+            text="레이스 세부설정",
+            font=ctk.CTkFont(weight="bold", size=15),
+            text_color="#F59E0B"
+        ).pack(side="left", padx=(15, 20))
+
+        ctk.CTkLabel(self.race_detail_frame, text="1판 획득 SP:").pack(side="left", padx=(0, 5))
+        self.entry_race_sp_per_run = ctk.CTkEntry(self.race_detail_frame, width=55, height=28, justify="center")
+        self.entry_race_sp_per_run.insert(0, str(self.config.get("race_sp_per_run", 10)))
+        self.entry_race_sp_per_run.pack(side="left", padx=(0, 15))
+
+        ctk.CTkLabel(self.race_detail_frame, text="완주 감지 시작(초):").pack(side="left", padx=(0, 5))
+        self.entry_finish_detect_start_sec = ctk.CTkEntry(self.race_detail_frame, width=60, height=28, justify="center")
+        self.entry_finish_detect_start_sec.insert(0, str(self.config.get("finish_detect_start_sec", 0)))
+        self.entry_finish_detect_start_sec.pack(side="left", padx=(0, 15))
+        
+        ctk.CTkLabel(self.race_detail_frame, text="완주 감지 최대(초):").pack(side="left", padx=(0, 5))
+        self.entry_finish_detect_max_sec = ctk.CTkEntry(self.race_detail_frame, width=60, height=28, justify="center")
+        self.entry_finish_detect_max_sec.insert(0, str(self.config.get("finish_detect_max_sec", 120)))
+        self.entry_finish_detect_max_sec.pack(side="left", padx=(0, 15))
+
+        ctk.CTkLabel(self.race_detail_frame, text="계산 여유 레이스:").pack(side="left", padx=(0, 5))
+        self.entry_race_count_bonus = ctk.CTkEntry(self.race_detail_frame, width=50, height=28, justify="center")
+        self.entry_race_count_bonus.insert(0, str(self.config.get("race_count_bonus", 1)))
+        self.entry_race_count_bonus.pack(side="left", padx=(0, 15))
+
+        ctk.CTkLabel(self.race_detail_frame, text="루프 기준 레이스:").pack(side="left", padx=(0, 5))
+        self.entry_loop_race_limit = ctk.CTkEntry(self.race_detail_frame, width=55, height=28, justify="center")
+        self.entry_loop_race_limit.insert(0, str(self.config.get("loop_race_limit", 100)))
+        self.entry_loop_race_limit.pack(side="left", padx=(0, 15))
+
+        ctk.CTkLabel(self.race_detail_frame, text="루프당 최대 SP:").pack(side="left", padx=(0, 5))
+        self.entry_max_sp_per_loop = ctk.CTkEntry(self.race_detail_frame, width=55, height=28, justify="center")
+        self.entry_max_sp_per_loop.insert(0, str(self.config.get("max_sp_per_loop", 990)))
+        self.entry_max_sp_per_loop.pack(side="left", padx=(0, 15))
+        
+        ctk.CTkLabel(self.race_detail_frame, text="루프 여유 보정:").pack(side="left", padx=(0, 5))
+        self.entry_loop_count_bonus = ctk.CTkEntry(self.race_detail_frame, width=50, height=28, justify="center")
+        self.entry_loop_count_bonus.insert(0, str(self.config.get("loop_count_bonus", 0)))
+        self.entry_loop_count_bonus.pack(side="left", padx=(0, 15))
 
         # ====== 新增：智能计算分配工具栏 (放在下方) ======
         # 【修改1】把 self.top_container 改成了 self
@@ -1662,18 +1789,34 @@ class FH_UltimateBot(ctk.CTk):
         self.bottom_frame = ctk.CTkFrame(self, fg_color="transparent", height=200)
         self.bottom_frame.pack(fill="both", expand=True, padx=18, pady=(6, 12))
 
+        self.hotkey_button_frame = ctk.CTkFrame(self.bottom_frame, fg_color="transparent")
+        self.hotkey_button_frame.pack(side="left", padx=6)
+
         self.btn_stop = ctk.CTkButton(
-            self.bottom_frame,
-            text=self.t("waiting_command"),
+            self.hotkey_button_frame,
+            text="⏹ 중지 (F8)",
             fg_color="#3A3A3A",
             hover_color="#4A4A4A",
             width=180,
-            height=60,
+            height=50,
             corner_radius=12,
-            font=ctk.CTkFont(size=16, weight="bold"),
+            font=ctk.CTkFont(size=15, weight="bold"),
             command=self.stop_all,
         )
-        self.btn_stop.pack(side="left", padx=6)
+        self.btn_stop.pack(pady=(0, 6))
+
+        self.btn_pause_hint = ctk.CTkButton(
+            self.hotkey_button_frame,
+            text="⏸ 일시정지/재개 (F9)",
+            fg_color="#3A3A3A",
+            hover_color="#4A4A4A",
+            width=180,
+            height=50,
+            corner_radius=12,
+            font=ctk.CTkFont(size=15, weight="bold"),
+            command=self.toggle_pause,
+        )
+        self.btn_pause_hint.pack()
 
         self.log_box = ctk.CTkTextbox(
             self.bottom_frame,
@@ -1875,7 +2018,7 @@ class FH_UltimateBot(ctk.CTk):
         if requested:
             self.ui_call(
                 self.btn_mini_pause.configure,
-                text="⏳ 정지 요청 중... (F9)",
+                text="⏳ 정지 요청 중...\n현재 작업 완료 후 정지",
                 fg_color="#D97706",
                 hover_color="#B96705",
                 state="normal"
@@ -2371,6 +2514,8 @@ class FH_UltimateBot(ctk.CTk):
         # 隐藏大窗的所有元素
         self.config_frame.pack_forget()
         self.global_settings_frame.pack_forget()
+        if hasattr(self, "race_detail_frame"):
+            self.race_detail_frame.pack_forget()
         self.calc_frame.pack_forget()
         if hasattr(self, "telegram_frame"):
             self.telegram_frame.pack_forget()
@@ -2572,6 +2717,8 @@ class FH_UltimateBot(ctk.CTk):
             # 【核心修复】：先让大容器里的东西全部解绑，洗牌重来
             self.config_frame.pack_forget()
             self.global_settings_frame.pack_forget()
+            if hasattr(self, "race_detail_frame"):
+                self.race_detail_frame.pack_forget()
             self.calc_frame.pack_forget()
             
             # 1. 铺设最外层大容器
@@ -2580,6 +2727,8 @@ class FH_UltimateBot(ctk.CTk):
             # 2. 依次按顺序塞入三个模块，完美保证从上到下的顺序！
             self.config_frame.pack(fill="x")
             self.global_settings_frame.pack(fill="x", pady=(15, 0))
+            if hasattr(self, "race_detail_frame"):
+                self.race_detail_frame.pack(fill="x", pady=(10, 0))
             self.calc_frame.pack(fill="x", pady=(10, 0))
             if hasattr(self, "telegram_frame"):
                 self.telegram_frame.pack(fill="x", pady=(10, 0))
@@ -2592,7 +2741,7 @@ class FH_UltimateBot(ctk.CTk):
             # 恢复窗口原本的状态
             self.btn_stop.configure(text=self.t("waiting_command_plain"), fg_color="#3A3A3A", hover_color="#4A4A4A")
             self.attributes("-topmost", False)
-            self.geometry("1800x800")
+            self.geometry("1800x880")
             self.center_window()
 
         self.ui_call(restore_ui)
@@ -2612,6 +2761,8 @@ class FH_UltimateBot(ctk.CTk):
 
         self.config_frame.pack_forget()
         self.global_settings_frame.pack_forget()
+        if hasattr(self, "race_detail_frame"):
+            self.race_detail_frame.pack_forget()
         self.calc_frame.pack_forget()
 
         if hasattr(self, "telegram_frame"):
@@ -3440,25 +3591,38 @@ class FH_UltimateBot(ctk.CTk):
 
     def get_scales_to_try(self, fast_mode=True):
         full_region = self.regions.get("全界面")
-        curr_w = full_region[2] if full_region else pyautogui.size()[0]
-    
+
+        if full_region:
+            curr_w = full_region[2]
+            curr_h = full_region[3]
+        else:
+            curr_w, curr_h = pyautogui.size()
+
         # 고해상도/4K 보정 옵션
         high_res_fix = bool(self.config.get("high_res_image_fix", False))
-    
-        # 대부분의 템플릿은 QHD 2560 기준으로 제작됨
-        primary_base = 2560
-        primary_scale = curr_w / primary_base
-    
+
+        # 대부분의 템플릿은 WQHD 2560x1440 기준으로 제작됨
+        base_w = 2560
+        base_h = 1440
+
+        width_scale = curr_w / base_w
+        height_scale = curr_h / base_h
+
+        # UWQHD(3440x1440)는 폭 기준 1.34가 아니라 세로 기준 1.0이 맞는 경우가 많음
+        # 4K(3840x2160)는 폭/세로 모두 1.5라 그대로 1.5가 됨
+        primary_scale = min(width_scale, height_scale)
+
         scales = []
-    
+
         def add_scale(s):
             s = round(float(s), 3)
             if 0.40 <= s <= 2.20 and s not in scales:
                 scales.append(s)
     
-        # 현재 해상도 기준 예상 배율
-        for mul in [1.0, 0.98, 1.02, 0.95, 1.05, 0.92, 1.08]:
-            add_scale(primary_scale * mul)
+        # 1순위: 실제 UI 크기에 가까운 세로/최소 기준 배율
+        for base_scale in [primary_scale, height_scale, width_scale]:
+            for mul in [1.0, 0.98, 1.02, 0.95, 1.05, 0.92, 1.08]:
+                add_scale(base_scale * mul)
     
         # 4K 보정 ON일 때: 1.5배 주변을 더 촘촘히 탐색
         if high_res_fix:
@@ -3472,8 +3636,18 @@ class FH_UltimateBot(ctk.CTk):
                 add_scale(s)
     
         # 다른 기준 해상도 호환
-        for bw in [3840, 3440, 3200, 2560, 1920, 1600]:
-            s = curr_w / bw
+        for bw, bh in [
+            (3840, 2160),
+            (3440, 1440),
+            (3200, 1800),
+            (2560, 1440),
+            (1920, 1080),
+            (1600, 900),
+        ]:
+            s_w = curr_w / bw
+            s_h = curr_h / bh
+            s = min(s_w, s_h)
+    
             for mul in [1.0, 0.98, 1.02]:
                 add_scale(s * mul)
     
@@ -3482,16 +3656,15 @@ class FH_UltimateBot(ctk.CTk):
             1.75, 1.70, 1.65, 1.60, 1.55,
             1.50, 1.45, 1.40, 1.35, 1.30,
             1.25, 1.20, 1.15, 1.10, 1.05,
-            1.00, 0.95, 0.90, 0.85, 0.80,
-            0.75, 0.70,
+            1.00, 0.98, 1.02, 0.95, 0.90,
+            0.85, 0.80, 0.75, 0.70,
         ]:
             add_scale(s)
     
-        # 기존 빠른 탐색은 너무 빨리 잘라서 4K에서 실패 가능성이 있음
         if fast_mode:
             if high_res_fix:
-                return scales[:18]
-            return scales[:8]
+                return scales[:24]
+            return scales[:10]
     
         return scales
 
@@ -5029,21 +5202,43 @@ class FH_UltimateBot(ctk.CTk):
             self.hw_key_down("up")
             
             # 初始化各类计时器
-            race_start_time = time.time()  # 新增：记录跑图发车时间
+            race_start_time = time.time()
             last_like_chk = time.time()
             last_chk = 0
             finished = False
-            timeout_triggered = False      # 新增：标记是否触发了120秒超时
-
+            timeout_triggered = False
+            
+            try:
+                finish_detect_start_sec = int(self.config.get("finish_detect_start_sec", 0))
+            except Exception:
+                finish_detect_start_sec = 0
+            
+            try:
+                finish_detect_max_sec = int(
+                    self.config.get(
+                        "finish_detect_max_sec",
+                        self.config.get("race_timeout_sec", 120)
+                    )
+                )
+            except Exception:
+                finish_detect_max_sec = 120
+            
+            finish_detect_start_sec = max(0, finish_detect_start_sec)
+            finish_detect_max_sec = max(30, finish_detect_max_sec)
+            
+            if finish_detect_start_sec >= finish_detect_max_sec:
+                finish_detect_start_sec = max(0, finish_detect_max_sec - 10)
+            
             while self.is_running:
                 now = time.time()
-                
-                # 【新增逻辑】：120秒超时防卡死检测
-                if now - race_start_time > 120.0:
-                    self.log("跑图超时(已超过120秒)！触发强制重开赛事逻辑...")
+                elapsed = now - race_start_time
+
+                # 완주 감지 최대시간 초과 방지
+                if elapsed > finish_detect_max_sec:
+                    self.log(f"跑图超时(已超过{finish_detect_max_sec}秒)！触发强制重开赛事逻辑...")
                     timeout_triggered = True
                     break
-                
+
                 # 【原生逻辑】：每隔3秒识别一次 likeauthor.png
                 if now - last_like_chk >= 3.0:
                     vram_result = self.check_vramne_during_race()
@@ -5060,14 +5255,14 @@ class FH_UltimateBot(ctk.CTk):
                         self.hw_press("enter")
                     last_like_chk = now
                     
-                # 【原生逻辑】：每1秒检测一次重新开始(正常完赛)
-                if now - last_chk >= 1.0:
+                # 완주 감지 시작시간 이후부터 restart.png 감지
+                if elapsed >= finish_detect_start_sec and now - last_chk >= 1.0:
                     found_restart = self.find_image_gray("restart.png", region=self.regions["下"], threshold=0.75, fast_mode=True)
                     if found_restart:
                         finished = True
                         break
                     last_chk = now
-                    
+                
                 time.sleep(0.3)
                 
             # 无论正常结束还是超时，都必须先松开油门和方向
